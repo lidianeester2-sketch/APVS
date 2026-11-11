@@ -8,7 +8,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Processos APVS">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="planilha.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <style>
@@ -274,30 +277,24 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <!-- PLANILHA -->
   <section data-view="planilha" class="view" hidden>
     <div class="panel">
-      <h2>Baixar para a sua planilha</h2>
-      <p class="hint">Entram os processos com revisão concluída no período, pela data da revisão.</p>
-      <div class="grid-form">
-        <label class="f">De<input type="date" id="ex-de"></label>
-        <label class="f">Até<input type="date" id="ex-ate"></label>
-        <label class="check"><input type="checkbox" id="ex-novos" checked> Só o que ainda não baixei</label>
-      </div>
+      <h2>Planilha do mês</h2>
+      <p class="hint">Gera o seu DASHBOARD igualzinho, com todas as abas, fórmulas e cores, já preenchido com os processos APVS do sistema.</p>
+      <label class="f">Mês<input type="month" id="ex-mes"></label>
       <div class="stats">
-        <div class="stat"><div class="v" id="st-n">0</div><div class="l">Processos</div></div>
+        <div class="stat"><div class="v" id="st-n">0</div><div class="l">Processos na BASE</div></div>
+        <div class="stat"><div class="v" id="st-rev">0</div><div class="l">Revisões concluídas</div></div>
         <div class="stat"><div class="v" id="st-red">R$ 0,00</div><div class="l">Redução obtida</div></div>
-        <div class="stat"><div class="v" id="st-dias">0</div><div class="l">Dias com revisão</div></div>
         <div class="stat"><div class="v" id="st-miss">0</div><div class="l">Sem datas de entrada</div></div>
       </div>
       <div class="tablebox">
         <table>
-          <thead><tr><th>Data</th><th class="num">Processos do dia</th><th class="num">Redução obtida</th></tr></thead>
+          <thead><tr><th>Dia</th><th class="num">Revisões</th><th class="num">Redução</th></tr></thead>
           <tbody id="tb-dias"></tbody>
         </table>
       </div>
-      <div class="row">
-        <button class="primary" id="btn-export">Baixar planilha (.xlsx)</button>
-        <span class="msg" id="ex-msg" role="status"></span>
-      </div>
-      <p class="hint">O arquivo tem três abas: <b>BASE DE DADOS</b> (mesmas colunas B–P da sua), <b>APVS DIÁRIO</b> (data, processos do dia e redução, nas colunas C–F da aba APVS) e <b>DETALHE</b> (tudo o que foi registrado). As colunas de fórmula vêm em branco: no Excel, cole com <b>Colar especial → Ignorar em branco</b> para não apagar suas fórmulas.</p>
+      <button class="primary" id="btn-export">Baixar planilha</button>
+      <div class="msg" id="ex-msg" role="status"></div>
+      <p class="hint">Na <b>BASE DE DADOS</b> entram os processos com liberação do regulador no mês. Na aba <b>APVS</b>, cada dia útil recebe as revisões concluídas e a redução do dia. Dias que já passaram sem revisão saem com 0.</p>
     </div>
   </section>
 </div>
@@ -455,76 +452,37 @@ function renderTable(){
 }
 
 /* ---------- export ---------- */
-(function initDates(){const n=new Date();$("#ex-de").value=ymd(new Date(n.getFullYear(),n.getMonth(),1));$("#ex-ate").value=ymd(n);})();
-function exportRows(){
-  const de=$("#ex-de").value, ate=$("#ex-ate").value, novos=$("#ex-novos").checked;
-  return all.filter(p=>(p.status==="comunicar"||p.status==="comunicado")&&p.revisadoEm)
-    .filter(p=>{const d=ymd(new Date(p.revisadoEm)); return (!de||d>=de)&&(!ate||d<=ate);})
-    .filter(p=>!novos||!p.exportadoEm)
-    .sort((a,b)=>a.revisadoEm-b.revisadoEm);
-}
-function porDia(rows){
-  const m=new Map();
-  rows.forEach(p=>{const k=ymd(new Date(p.revisadoEm)); const o=m.get(k)||{n:0,red:0}; o.n++; o.red+=p.reducao||0; m.set(k,o);});
-  return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-}
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+(function(){const n=new Date();$("#ex-mes").value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;})();
 function renderExport(){
-  const rows=exportRows(), dias=porDia(rows);
-  $("#st-n").textContent=rows.length;
-  $("#st-red").textContent=brl(rows.reduce((s,p)=>s+(p.reducao||0),0));
-  $("#st-dias").textContent=dias.length;
-  $("#st-miss").textContent=rows.filter(faltaData).length;
-  $("#tb-dias").innerHTML=dias.length?dias.map(([k,o])=>`<tr><td>${k.split("-").reverse().join("/")}</td><td class="num">${o.n}</td><td class="num">${brl(Math.round(o.red*100)/100)}</td></tr>`).join("")
-    :`<tr><td colspan="3" class="empty">Nenhuma revisão concluída nesse período${$("#ex-novos").checked?" que ainda não tenha sido baixada":""}.</td></tr>`;
-  $("#btn-export").disabled=!rows.length;
+  const mes=$("#ex-mes").value; if(!mes||!window.PlanilhaAPVS) return;
+  const {base,porDia}=PlanilhaAPVS.resumo(all,mes);
+  const dias=Object.keys(porDia).sort();
+  $("#st-n").textContent=base.length;
+  $("#st-rev").textContent=dias.reduce((s,k)=>s+porDia[k].n,0);
+  $("#st-red").textContent=brl(Math.round(dias.reduce((s,k)=>s+porDia[k].red,0)*100)/100);
+  $("#st-miss").textContent=base.filter(faltaData).length;
+  $("#tb-dias").innerHTML=dias.length?dias.map(k=>`<tr><td>${k.split("-").reverse().slice(0,2).join("/")}</td><td class="num">${porDia[k].n}</td><td class="num">${brl(Math.round(porDia[k].red*100)/100)}</td></tr>`).join("")
+    :`<tr><td colspan="3" class="empty">Nenhuma revisão concluída neste mês ainda.</td></tr>`;
+  const [y,m]=mes.split("-").map(Number);
+  $("#btn-export").textContent=`Baixar planilha de ${MESES[m-1]}`;
+  $("#btn-export").disabled=!base.length&&!dias.length;
 }
-["#ex-de","#ex-ate","#ex-novos"].forEach(s=>$(s).addEventListener("change",renderExport));
-
-const toDate=s=>s?new Date(s):null;
-const dayDate=ms=>{const d=new Date(ms);return new Date(d.getFullYear(),d.getMonth(),d.getDate());};
-function buildWorkbook(rows){
-  const wb=XLSX.utils.book_new();
-  const obsTxt=p=>[p.erro2?"2º erro: "+p.erro2:"",p.descricaoErro||""].filter(Boolean).join(" · ");
-  // BASE DE DADOS: colunas A..P, cabeçalho igual ao da sua planilha
-  const base=[["","PROTOCOLO","ENTRADA","REGULAÇÃO","REGULADOR","ASSOCIAÇÃO","HRS USADAS","SLA (H)","STATUS SLA","AUDITORIA","TIPO ERRO","PORTE","VALOR OFICINA (GABRIEL)","VALOR APROVADO","VENCIMENTO","OBSERVAÇÕES"]];
-  rows.forEach(p=>base.push(["",p.protocolo,toDate(p.entrada),toDate(p.regulacao),(p.regulador||"").toUpperCase(),"APVS",null,null,null,auditoriaDe(p)||null,p.erro||null,p.porte||null,null,p.valorAprovado??null,null,obsTxt(p)]));
-  const ws1=XLSX.utils.aoa_to_sheet(base,{cellDates:true});
-  fmtCol(ws1,["C","D"],rows.length,"dd/mm/yyyy hh:mm"); fmtCol(ws1,["N"],rows.length,'"R$" #,##0.00');
-  ws1["!cols"]=[{wch:2},{wch:28},{wch:16},{wch:16},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:9},{wch:12},{wch:14},{wch:10},{wch:50}];
-  XLSX.utils.book_append_sheet(wb,ws1,"BASE DE DADOS");
-  // APVS DIÁRIO: colunas C..F como na aba APVS
-  const dia=[["","","DATA","PROCESSOS DO DIA","ACUMULADO (fórmula)","REDUÇÃO OBTIDA (R$)"]];
-  porDia(rows).forEach(([k,o])=>{const [y,m,d]=k.split("-").map(Number); dia.push(["","",new Date(y,m-1,d),o.n,null,Math.round(o.red*100)/100]);});
-  const ws2=XLSX.utils.aoa_to_sheet(dia,{cellDates:true});
-  fmtCol(ws2,["C"],dia.length-1,"dd/mm/yyyy"); fmtCol(ws2,["F"],dia.length-1,'"R$" #,##0.00');
-  ws2["!cols"]=[{wch:2},{wch:2},{wch:12},{wch:18},{wch:18},{wch:20}];
-  XLSX.utils.book_append_sheet(wb,ws2,"APVS DIÁRIO");
-  // DETALHE
-  const det=[["PROTOCOLO","REGULADOR","ENTRADA","LIBERAÇÃO REGULADOR","PORTE","RESULTADO","REDUÇÃO OBTIDA (R$)","VALOR APROVADO (R$)","VALOR A COMUNICAR (R$)","OBSERVAÇÃO DA REVISÃO","REVISADO EM","STATUS","COMUNICADO EM","NOTA DA COMUNICAÇÃO","ERROS","DESCRIÇÃO DO ERRO"]];
-  rows.forEach(p=>det.push([p.protocolo,(p.regulador||"").toUpperCase(),toDate(p.entrada),toDate(p.regulacao),p.porte||"",(RES[p.resultado]||{}).l||"",p.reducao??null,p.valorAprovado??null,p.valorComunicar??null,p.obs||"",p.revisadoEm?new Date(p.revisadoEm):null,STATUS[p.status]||"",p.comunicadoEm?new Date(p.comunicadoEm):null,p.notaComunicacao||"",errosTxt(p),p.descricaoErro||""]));
-  const ws3=XLSX.utils.aoa_to_sheet(det,{cellDates:true});
-  fmtCol(ws3,["C","D","K","M"],rows.length,"dd/mm/yyyy hh:mm"); fmtCol(ws3,["G","H","I"],rows.length,'"R$" #,##0.00');
-  ws3["!cols"]=[{wch:28},{wch:12},{wch:16},{wch:18},{wch:9},{wch:24},{wch:14},{wch:14},{wch:14},{wch:40},{wch:16},{wch:13},{wch:16},{wch:30},{wch:24},{wch:40}];
-  XLSX.utils.book_append_sheet(wb,ws3,"DETALHE");
-  return XLSX.write(wb,{type:"array",bookType:"xlsx"});
-}
-function fmtCol(ws,cols,n,z){cols.forEach(c=>{for(let r=2;r<=n+1;r++){const cell=ws[c+r]; if(cell&&cell.v!=null) cell.z=z;}});}
-
+$("#ex-mes").addEventListener("change",renderExport);
 $("#btn-export").addEventListener("click",async()=>{
-  const msg=$("#ex-msg"); msg.className="msg"; msg.textContent="";
-  const rows=exportRows(); if(!rows.length) return;
-  if(typeof XLSX==="undefined"){msg.className="msg err";msg.textContent="O gerador de planilha não carregou. Recarregue a página e tente de novo.";return;}
-  const de=$("#ex-de").value.split("-").reverse().join("-"), ate=$("#ex-ate").value.split("-").reverse().join("-");
-  const blob=new Blob([buildWorkbook(rows)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`APVS_${de}_a_${ate}.xlsx`;
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  msg.textContent="Marcando como baixados…";
-  const ids=rows.map(p=>p.id), agora=new Date().toISOString();
-  for(let i=0;i<ids.length;i+=100){
-    const {error}=await sb.from("processos").update({exportado_em:agora}).in("id",ids.slice(i,i+100));
-    if(error){ msg.className="msg err"; msg.textContent="A planilha foi baixada, mas não consegui marcar os processos como baixados."; return; }
-  }
-  msg.className="msg ok"; msg.textContent=`${rows.length} processos baixados.`;
+  const msg=$("#ex-msg"), btn=$("#btn-export"); msg.className="msg"; msg.textContent="Gerando a planilha…"; btn.disabled=true;
+  try{
+    if(!window.JSZip||!window.PlanilhaAPVS) throw new Error("O gerador não carregou. Recarregue a página.");
+    const resp=await fetch("modelo.xlsx",{cache:"no-store"});
+    if(!resp.ok) throw new Error("Não encontrei o arquivo modelo.xlsx no site.");
+    const mes=$("#ex-mes").value, [y,m]=mes.split("-");
+    const bytes=await PlanilhaAPVS.gerar(JSZip,await resp.arrayBuffer(),all,mes,new Date());
+    const blob=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`DASHBOARD APVS ${m}-${y}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    msg.className="msg ok"; msg.textContent="Planilha baixada.";
+  }catch(e){ msg.className="msg err"; msg.textContent=e.message||"Não foi possível gerar a planilha."; }
+  btn.disabled=false;
 });
 
 /* ---------- modal ---------- */
