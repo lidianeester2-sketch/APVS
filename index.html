@@ -39,11 +39,27 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);fo
 
 /* header */
 header.top{display:flex;flex-direction:column;gap:2px;padding-top:8px}
-.topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;min-height:28px}
-.topbar .who{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;margin-bottom:8px}
+.brand{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--navy);letter-spacing:.01em;text-transform:uppercase}
+.brand img{height:22px;width:auto}
+.tb-actions{display:flex;align-items:center;gap:8px}
+.pill-btn{display:inline-flex;align-items:center;gap:6px;height:36px;min-height:36px;padding:0 14px 0 11px;border-radius:18px;background:var(--surface);color:var(--navy);font-size:14px;font-weight:600;box-shadow:0 1px 3px rgba(20,22,58,.1)}
+.pill-btn svg{width:18px;height:18px}
+.pill-btn[aria-pressed="true"]{background:var(--coral);color:#fff;box-shadow:0 2px 8px rgba(251,93,66,.35)}
+.pill-btn[aria-pressed="true"] .off{display:none}
+.avatar{width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;background:var(--navy);color:#fff;font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(20,22,58,.2)}
+.avatar.big{width:52px;height:52px;font-size:21px;flex-shrink:0}
+.acc-head{display:flex;align-items:center;gap:12px}
+.acc-head b{display:block;font-size:17px}
+.acc-head span{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+button.dl-row{width:100%;background:transparent;border-radius:0;min-height:48px;color:var(--ink);font-weight:500;align-items:center;text-align:left}
+button.dl-row.danger{color:var(--red)}
+.switch{width:46px;height:28px;border-radius:14px;background:var(--fill-2);position:relative;flex-shrink:0;transition:background .2s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s}
+.switch.on{background:#34C759}
+.switch.on::after{transform:translateX(18px)}
 h1{font-size:34px;line-height:1.1;font-weight:700;margin:0;letter-spacing:-.02em;color:var(--navy)}
-.sub{color:var(--muted);font-size:15px;display:flex;align-items:center;gap:7px}
-.sub img{height:18px;width:auto}
+
 
 /* desktop segmented control */
 nav.tabs{display:flex;gap:2px;background:var(--fill-2);padding:2px;border-radius:10px}
@@ -171,11 +187,23 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .stat .l{font-size:13px;color:var(--muted)}
 .check{display:flex;gap:10px;align-items:center;font-size:16px;min-height:44px}
 .check input{accent-color:var(--accent);width:20px;height:20px}
+/* detalhe */
+.dl-title{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:-8px}
+.dl{background:var(--fill);border-radius:12px;display:flex;flex-direction:column}
+.dl-row{display:flex;justify-content:space-between;gap:12px;padding:11px 14px;font-size:15px}
+.dl-row + .dl-row{border-top:.5px solid var(--sep)}
+.dl-row span{color:var(--muted)}
+.dl-row b{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.tl{list-style:none;margin:0;padding:0 0 0 4px;display:flex;flex-direction:column;gap:12px}
+.tl li{position:relative;padding-left:20px;display:flex;justify-content:space-between;gap:10px;font-size:15px}
+.tl li::before{content:"";position:absolute;left:0;top:6px;width:9px;height:9px;border-radius:50%;background:var(--coral)}
+.tl li + li::after{content:"";position:absolute;left:4px;top:-14px;height:18px;border-left:1.5px solid var(--fill-2)}
+.tl b{font-weight:500}
+.tl span{color:var(--muted);white-space:nowrap}
+div.card.click{cursor:pointer}
+
 /* avisos */
-.iconbtn{display:inline-flex;align-items:center;gap:5px}
-.iconbtn svg{width:20px;height:20px}
-.iconbtn[aria-pressed="true"]{color:var(--coral-ink)}
-.iconbtn[aria-pressed="true"] .off{display:none}
+
 .toast{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40;width:min(440px,calc(100% - 24px));
   background:rgba(255,255,255,.94);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:16px;box-shadow:0 10px 40px rgba(20,22,58,.22);
   padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;animation:drop .35s cubic-bezier(.2,.9,.3,1)}
@@ -183,21 +211,21 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .toast b{display:block;font-size:15px}
 .toast span{font-size:14px;color:var(--muted)}
 @keyframes drop{from{transform:translate(-50%,-30px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
-@media (max-width:420px){.topbar .who{display:none}}
+@media (max-width:380px){#avisos-txt{display:none}.pill-btn{padding:0 9px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="topbar" id="userbox" hidden>
-      <span class="who" id="user-email"></span>
-      <button class="ghost iconbtn" id="btn-avisos" type="button" aria-pressed="false" title="Avisos de processos novos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 4.5 1.8 6 1.8 6H4.2S6 14 6 9.5z"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/><path class="off" d="M3.5 3.5l17 17"/></svg><span id="avisos-txt">Avisos</span></button>
-      <button class="ghost" id="btn-senha" type="button">Senha</button>
-      <button class="ghost" id="btn-sair" type="button">Sair</button>
+    <div class="topbar">
+      <div class="brand"><img src="gs-simbolo.png" alt="">Gestão Segura</div>
+      <div class="tb-actions" id="userbox" hidden>
+        <button class="pill-btn" id="btn-avisos" type="button" aria-pressed="false" title="Avisos de processos novos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 4.5 1.8 6 1.8 6H4.2S6 14 6 9.5z"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/><path class="off" d="M3.5 3.5l17 17"/></svg><span id="avisos-txt">Avisos</span></button>
+        <button class="avatar" id="btn-menu" type="button" aria-label="Minha conta">·</button>
+      </div>
     </div>
     <h1>Processos APVS</h1>
-    <div class="sub"><img src="gs-simbolo.png" alt="">Gestão Segura</div>
   </header>
 
   <nav class="tabs" aria-label="Etapas">
@@ -233,7 +261,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
         <div class="filters" id="filters"></div>
       </div>
       <div class="list" id="tb-all"></div>
-      <p class="hint">Toque num processo para corrigir datas ou dados. <span class="miss">Faltam datas</span> aparece quando o Cristiano registrou um protocolo que você ainda não tinha lançado.</p>
+      <p class="hint">Toque num processo para ver tudo sobre ele. <span class="miss">Faltam datas</span> aparece quando o Cristiano registrou um protocolo que você ainda não tinha lançado.</p>
     </div>
   </section>
 
@@ -244,7 +272,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
         <h2>Aguardando revisão <span class="count" id="c-rev2">0</span></h2>
         <button class="primary" id="btn-novo">+ Novo protocolo</button>
       </div>
-      <p class="hint">Toque no processo para registrar a revisão. Se o protocolo não estiver na lista, use “Novo protocolo”.</p>
+      <p class="hint">Toque no processo para ver os detalhes e revisar. Se o protocolo não estiver na lista, use “Novo protocolo”.</p>
       <div class="cards" id="list-revisao"></div>
     </div>
     <div class="panel">
@@ -385,7 +413,7 @@ function route(){
   const t=!session?"login":allowed.length?(allowed.includes(h)?h:allowed[0]):"aguardando";
   document.querySelectorAll("[data-view]").forEach(v=>v.hidden=v.dataset.view!==t);
   const nav=document.querySelector("nav.tabs"); nav.hidden=allowed.length<2;
-  document.querySelectorAll("nav.tabs a").forEach(a=>{ a.hidden=!allowed.includes(a.dataset.tab); if(a.dataset.tab===t) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
+  document.querySelectorAll("nav.tabs a").forEach(a=>{ a.hidden=!allowed.includes(a.dataset.tab); a.style.order=allowed.indexOf(a.dataset.tab); if(a.dataset.tab===t) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
   $("#btn-novo").hidden=!podeRevisar();
 }
 function aguardando(titulo,texto){ $("#ag-titulo").textContent=titulo; $("#ag-texto").textContent=texto; }
@@ -415,12 +443,7 @@ function render(){
 function setCount(id,n,hot){const el=$("#"+id); el.textContent=n; el.classList.toggle("hot",hot&&n>0);}
 
 function cardRevisao(p){
-  if(!podeRevisar()) return `<div class="card">
-    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
-    <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}</div>
-    ${p.status==="devolvido"&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
-  </div>`;
-  return `<button class="card click" data-act="revisar" data-id="${esc(p.id)}">
+  return `<button class="card click" data-act="detalhe" data-id="${esc(p.id)}">
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
     <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}${p.porte?`<span>Porte <b>${esc(p.porte)}</b></span>`:""}</div>
     ${p.status==="devolvido"&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
@@ -435,7 +458,7 @@ function valorDestaque(p){
   return parts.length?`<div class="row" style="gap:20px">${parts.join("")}</div>`:"";
 }
 function cardComunicar(p){
-  return `<div class="card">
+  return `<div class="card click" data-act="detalhe" data-id="${esc(p.id)}">
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span><span class="chip s-comunicar">${esc(p.porte||"")}</span></div>
     <div class="res">${esc((RES[p.resultado]||{}).l||"—")}</div>
     ${valorDestaque(p)}
@@ -445,7 +468,7 @@ function cardComunicar(p){
   </div>`;
 }
 function cardComunicado(p){
-  return `<div class="card">
+  return `<div class="card click" data-act="detalhe" data-id="${esc(p.id)}">
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip("comunicado")}</div>
     <div class="meta"><span><b>${esc((RES[p.resultado]||{}).l||"—")}</b></span><span>Comunicado <b>${fmtTs(p.comunicadoEm)}</b></span></div>
     ${p.notaComunicacao?`<div class="obs">${esc(p.notaComunicacao)}</div>`:""}
@@ -468,7 +491,7 @@ function renderTable(){
   box.innerHTML=rows.length?rows.slice(0,400).map(p=>{
     const sub=[p.regulador||"", (RES[p.resultado]||{}).l||"", p.erro&&p.erro!==SEM_ERRO?p.erro:""].filter(Boolean).join(" · ");
     const side=faltaData(p)?'<span class="miss">Faltam datas</span>':(p.reducao!=null?brl(p.reducao):(p.regulacao?fmtLocal(p.regulacao):""));
-    return `<button class="lrow" data-act="editar" data-id="${esc(p.id)}">
+    return `<button class="lrow" data-act="detalhe" data-id="${esc(p.id)}">
       <div class="lmain"><span class="proto">${esc(p.protocolo)}</span><span class="lsub">${esc(sub)||"&nbsp;"}</span></div>
       <div class="lside">${statusChip(p.status)}<span>${side}</span></div>${CHEV}</button>`;}).join("")
     :`<div class="empty">Nenhum processo aqui ainda. Registre o primeiro no formulário acima.</div>`;
@@ -593,6 +616,54 @@ function revisaoForm(p,novo){
   if(novo) $("#rv-proto").addEventListener("change",()=>{const ex=all.find(x=>x.id===docId($("#rv-proto").value)); if(ex){ $("#rv-reg").value=ex.regulador||""; $("#rv-msg").textContent=`Esse protocolo já está registrado (${STATUS[ex.status]}). Ao concluir, a revisão substitui a anterior.`; }});
 }
 
+function detalheForm(p){
+  const r=RES[p.resultado]||{};
+  const linha=(rotulo,valor,cls)=>valor||valor===0?`<div class="dl-row"><span>${rotulo}</span><b class="${cls||""}">${valor}</b></div>`:"";
+  const grupo=(titulo,linhas)=>{const c=linhas.filter(Boolean).join("");return c?`<div class="dl-title">${titulo}</div><div class="dl">${c}</div>`:"";};
+  const eventos=[
+    [p.criadoEm,p.criadoPor==="revisao"?"Registrado pelo Cristiano":"Registrado"],
+    [p.devolvidoEm,"Devolvido ao regulador"],
+    [p.revisadoEm,"Revisão concluída"],
+    [p.comunicadoEm,"Comunicado"],
+  ].filter(e=>e[0]).sort((a,b)=>a[0]-b[0]);
+  const podeComunicar=(role==="comunicacao"||role==="gestor")&&p.status==="comunicar";
+  const podeRev=podeRevisar()&&(p.status==="revisao"||p.status==="devolvido");
+  openSheet(`
+    <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:10px">
+      <div style="min-width:0"><h3 id="ov-title" class="proto" style="font-size:17px">${esc(p.protocolo)}</h3>
+      <button class="ghost" id="dt-copy" style="padding:2px 0;min-height:0;font-size:14px">Copiar protocolo</button></div>
+      ${statusChip(p.status)}
+    </div>
+    ${r.l?`<div><div class="res">${esc(r.l)}</div>${valorDestaque(p)}</div>`:""}
+    ${grupo("Processo",[
+      linha("Regulador",esc(p.regulador||"")),
+      linha("Porte",esc(p.porte||"")),
+      linha("Entrada",p.entrada?fmtLocal(p.entrada):'<span class="miss">Falta</span>'),
+      linha("Liberação do regulador",p.regulacao?fmtLocal(p.regulacao):'<span class="miss">Falta</span>'),
+    ])}
+    ${grupo("Revisão",[
+      linha("Erro do regulador",esc(p.erro||"")),
+      linha("Segundo erro",esc(p.erro2||"")),
+      p.reducao!=null&&!r.red?linha("Redução obtida",brl(p.reducao)):"",
+    ])}
+    ${p.descricaoErro?`<div class="dl-title">Descrição do erro</div><div class="obs">${esc(p.descricaoErro)}</div>`:""}
+    ${p.obs?`<div class="dl-title">Observação da revisão</div><div class="obs">${esc(p.obs)}</div>`:""}
+    ${p.notaComunicacao?`<div class="dl-title">Nota da comunicação</div><div class="obs">${esc(p.notaComunicacao)}</div>`:""}
+    ${eventos.length?`<div class="dl-title">Histórico</div><ol class="tl">${eventos.map(e=>`<li><b>${e[1]}</b><span>${fmtTs(e[0])}</span></li>`).join("")}</ol>`:""}
+    <div class="msg err" id="dt-msg"></div>
+    <div class="row end">
+      <button class="ghost" id="dt-close">Fechar</button>
+      ${role==="gestor"?'<button id="dt-edit">Editar</button>':""}
+      ${podeRev?'<button class="primary" id="dt-rev">Revisar</button>':""}
+      ${podeComunicar?'<button class="primary" id="dt-com">Marcar como comunicado</button>':""}
+    </div>`);
+  $("#dt-close").onclick=closeSheet;
+  $("#dt-copy").onclick=async()=>{ try{ await navigator.clipboard.writeText(p.protocolo); $("#dt-copy").textContent="Copiado"; }catch(e){ $("#dt-copy").textContent=p.protocolo; } };
+  if($("#dt-edit")) $("#dt-edit").onclick=()=>editarForm(p);
+  if($("#dt-rev")) $("#dt-rev").onclick=()=>revisaoForm(p,false);
+  if($("#dt-com")) $("#dt-com").onclick=()=>comunicarForm(p);
+}
+
 function comunicarForm(p){
   openSheet(`<h3 id="ov-title">Marcar como comunicado</h3>
     <div><div class="proto">${esc(p.protocolo)}</div><div class="meta"><span><b>${esc((RES[p.resultado]||{}).l||"")}</b></span></div></div>
@@ -639,6 +710,7 @@ document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); if(!a) return;
   const p=all.find(x=>x.id===a.dataset.id); if(!p) return;
   if(!db) return;
+  if(a.dataset.act==="detalhe") detalheForm(p);
   if(a.dataset.act==="revisar"&&podeRevisar()) revisaoForm(p,false);
   if(a.dataset.act==="comunicar") comunicarForm(p);
   if(a.dataset.act==="editar") editarForm(p);
@@ -736,6 +808,7 @@ function tocarAlarme(){
 }
 function atualizarBotaoAvisos(){
   const on=avisosLigados(); $("#btn-avisos").setAttribute("aria-pressed",on); $("#avisos-txt").textContent=on?"Avisos ligados":"Avisos";
+  $("#btn-avisos").title=on?"Avisos ligados: toque para desligar":"Ligar avisos de processos novos";
 }
 $("#btn-avisos").addEventListener("click",async()=>{
   if(avisosLigados()){ lsSet("avisos","0"); atualizarBotaoAvisos(); mostrarToast("Avisos desligados","Você não vai mais ouvir o alarme.",null); return; }
@@ -801,7 +874,23 @@ function senhaForm(primeira){
     closeSheet(); mostrarToast("Senha alterada","Use a nova senha no próximo acesso.",null);
   };
 }
-$("#btn-senha").addEventListener("click",()=>{ if(session) senhaForm(false); });
+let contaEmail="", contaNome="";
+function menuConta(){
+  const on=avisosLigados();
+  openSheet(`<div class="acc-head"><div class="avatar big">${esc((contaNome||contaEmail||"?").charAt(0).toUpperCase())}</div>
+      <div style="min-width:0"><b id="ov-title">${esc(contaNome||"Minha conta")}</b><span>${esc(contaEmail)}</span></div></div>
+    <div class="dl">
+      <button class="dl-row" id="mn-senha"><span style="color:var(--ink)">Trocar senha</span>${CHEV}</button>
+      <button class="dl-row" id="mn-avisos"><span style="color:var(--ink)">Avisos de processos novos</span><i class="switch ${on?"on":""}"></i></button>
+    </div>
+    <div class="dl"><button class="dl-row danger" id="mn-sair">Sair</button></div>
+    <div class="row end"><button class="ghost" id="mn-fechar">Fechar</button></div>`);
+  $("#mn-fechar").onclick=closeSheet;
+  $("#mn-senha").onclick=()=>senhaForm(false);
+  $("#mn-avisos").onclick=()=>{ $("#btn-avisos").click(); $("#mn-avisos .switch").classList.toggle("on",avisosLigados()); };
+  $("#mn-sair").onclick=async()=>{ closeSheet(); await sb.auth.signOut(); encerrar(); };
+}
+$("#btn-menu").addEventListener("click",()=>{ if(session) menuConta(); });
 async function carregarProcessos(){
   if(!role) return;
   const {data,error}=await sb.from("processos").select("*").order("criado_em",{ascending:false}).limit(5000);
@@ -814,8 +903,9 @@ async function carregarPessoas(){
   pessoas=data||[]; renderPessoas();
 }
 async function carregarPerfil(){
-  const {data}=await sb.from("perfis").select("papel").eq("id",myId).maybeSingle();
+  const {data}=await sb.from("perfis").select("papel,nome").eq("id",myId).maybeSingle();
   const papel=(data&&data.papel)||null;
+  contaNome=(data&&data.nome)||""; $("#btn-menu").textContent=(contaNome||contaEmail||"?").charAt(0).toUpperCase();
   isOwner=papel==="gestor";
   if(!papel){ aguardando("Seu acesso ainda não foi liberado","Avise a Lidi. Assim que ela liberar, sua parte aparece aqui."); $("#sync").textContent=""; }
   setRole(papel);
@@ -823,7 +913,7 @@ async function carregarPerfil(){
 function agendar(){ clearTimeout(recarga); recarga=setTimeout(()=>{carregarProcessos();carregarPessoas();},300); }
 async function iniciar(s){
   session=s; myId=s.user.id;
-  $("#user-email").textContent=s.user.email||""; $("#userbox").hidden=false; atualizarBotaoAvisos(); filaAnterior=null;
+  contaEmail=s.user.email||""; $("#btn-menu").textContent=contaEmail.charAt(0).toUpperCase(); $("#userbox").hidden=false; atualizarBotaoAvisos(); filaAnterior=null;
   $("#sync").textContent="Carregando…";
   await carregarPerfil(); await carregarProcessos(); await carregarPessoas();
   if(canal) sb.removeChannel(canal);
@@ -847,7 +937,7 @@ $("#f-login").addEventListener("submit",async e=>{
   if(error){ m.textContent=/invalid/i.test(error.message)?"E-mail ou senha incorretos.":"Não foi possível entrar: "+error.message; return; }
   $("#lg-senha").value=""; iniciar(data.session);
 });
-$("#btn-sair").addEventListener("click",async()=>{ await sb.auth.signOut(); encerrar(); });
+
 sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_OUT"&&session) encerrar(); });
 
 render();
