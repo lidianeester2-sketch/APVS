@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Processos APVS</title>
-<meta name="theme-color" content="#F2F2F7">
+<meta name="theme-color" content="#F3F3F8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Processos APVS">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="planilha.js"></script>
@@ -17,12 +17,14 @@
 <style>
 /* iOS grouped-inset look: large title, white rounded groups on #F2F2F7, bottom tab bar on phone, segmented control on desktop, bottom sheets. */
 :root{
-  --bg:#F2F2F7; --surface:#FFFFFF; --fill:#F2F2F7; --fill-2:#E5E5EA; --sep:rgba(60,60,67,.14);
-  --ink:#000000; --muted:rgba(60,60,67,.62); --faint:rgba(60,60,67,.3);
-  --accent:#007AFF; --accent-soft:rgba(0,122,255,.12);
+  /* Gestão Segura: azul-marinho #2D3178 + coral #FB5D42 */
+  --navy:#2D3178; --coral:#FB5D42; --coral-ink:#D1401F;
+  --bg:#F3F3F8; --surface:#FFFFFF; --fill:#F1F1F7; --fill-2:#E4E5EF; --sep:rgba(45,49,120,.13);
+  --ink:#14163A; --muted:rgba(45,49,90,.62); --faint:rgba(45,49,90,.3);
+  --accent:#2D3178; --accent-soft:rgba(45,49,120,.1);
   --orange:#C25E00; --orange-soft:rgba(255,149,0,.15);
   --red:#D70015; --red-bright:#FF3B30; --red-soft:rgba(255,59,48,.12);
-  --blue:#0060DF; --blue-soft:rgba(0,122,255,.12);
+  --blue:#2D3178; --blue-soft:rgba(45,49,120,.1);
   --green:#1E7D34; --green-soft:rgba(52,199,89,.16);
   --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,"Segoe UI",Roboto,sans-serif;
   --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
@@ -39,16 +41,17 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);fo
 header.top{display:flex;flex-direction:column;gap:2px;padding-top:8px}
 .topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;min-height:28px}
 .topbar .who{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-h1{font-size:34px;line-height:1.1;font-weight:700;margin:0;letter-spacing:-.02em}
-.sub{color:var(--muted);font-size:15px}
+h1{font-size:34px;line-height:1.1;font-weight:700;margin:0;letter-spacing:-.02em;color:var(--navy)}
+.sub{color:var(--muted);font-size:15px;display:flex;align-items:center;gap:7px}
+.sub img{height:18px;width:auto}
 
 /* desktop segmented control */
 nav.tabs{display:flex;gap:2px;background:var(--fill-2);padding:2px;border-radius:10px}
 nav.tabs a{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border-radius:8px;text-decoration:none;color:var(--ink);font-size:14px;font-weight:500;white-space:nowrap}
 nav.tabs a svg{display:none}
-nav.tabs a[aria-current="page"]{background:var(--surface);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
+nav.tabs a[aria-current="page"]{background:var(--surface);font-weight:600;color:var(--navy);box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
 .count{font-size:12px;font-weight:600;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--fill);color:var(--muted);font-variant-numeric:tabular-nums}
-.count.hot{background:var(--red-bright);color:#fff}
+.count.hot{background:var(--coral);color:#fff}
 nav.tabs .count:not(.hot){display:none}
 
 /* phone tab bar */
@@ -63,7 +66,7 @@ nav.tabs .count:not(.hot){display:none}
   nav.tabs .count{position:absolute;top:-2px;left:calc(50% + 6px);height:18px;min-width:18px;font-size:11px;padding:0 5px}
 }
 
-a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(0,122,255,.45);outline-offset:2px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(251,93,66,.5);outline-offset:2px}
 
 .banner{padding:12px 14px;border-radius:12px;font-size:15px;background:var(--orange-soft);color:var(--orange)}
 .sync{font-size:12px;color:var(--muted);text-align:center}
@@ -99,7 +102,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .card{background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;border:.5px solid var(--sep)}
 .panel .card{background:var(--surface)}
 .card.click{cursor:pointer;text-align:left;font-weight:400;color:var(--ink);font-size:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.card.click:hover{border-color:var(--accent)}
+.card.click:hover{border-color:var(--coral)}
 .proto{font-family:var(--f-mono);font-weight:600;font-size:14.5px;word-break:break-all;letter-spacing:0}
 .meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:14px;color:var(--muted)}
 .meta b{color:var(--ink);font-weight:500}
@@ -118,7 +121,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;max-width:100%}
 .filters::-webkit-scrollbar{display:none}
 .filters button{font-weight:500;font-size:14px;padding:6px 12px;min-height:32px;border-radius:16px;background:var(--fill);color:var(--ink);white-space:nowrap}
-.filters button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.filters button[aria-pressed="true"]{background:var(--navy);color:#fff}
 .searchrow{display:flex;flex-direction:column;gap:10px}
 
 /* iOS list */
@@ -176,7 +179,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <header class="top">
     <div class="topbar" id="userbox" hidden><span class="who" id="user-email"></span><button class="ghost" id="btn-sair" type="button">Sair</button></div>
     <h1>Processos APVS</h1>
-    <div class="sub">Gestão Segura</div>
+    <div class="sub"><img src="gs-simbolo.png" alt="">Gestão Segura</div>
   </header>
 
   <nav class="tabs" aria-label="Etapas">
