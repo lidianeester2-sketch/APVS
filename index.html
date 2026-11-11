@@ -247,11 +247,12 @@ div.card.click{cursor:pointer}
       <form id="f-reg" class="grid-form" autocomplete="off">
         <label class="f">Protocolo<input id="reg-proto" class="mono" required placeholder="A202611S27I 249805-0APVS"></label>
         <label class="f">Regulador<input id="reg-regulador" list="regs" required placeholder="EMERSON"></label>
-        <label class="f">Entrada<input id="reg-entrada" type="datetime-local"></label>
-        <label class="f">Liberação do regulador<input id="reg-regulacao" type="datetime-local"></label>
+        <label class="f">Entrada<input id="reg-entrada" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm"></label>
+        <label class="f">Liberação do regulador<input id="reg-regulacao" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm"></label>
         <div class="row"><button class="primary" type="submit" id="reg-btn">Registrar</button></div>
       </form>
       <div class="msg" id="reg-msg" role="status"></div>
+      <p class="hint">Dica: copie da sua planilha as colunas Protocolo, Entrada, Regulação e Regulador e cole no campo Protocolo. Os campos se preenchem sozinhos. Colando várias linhas, dá para registrar todas de uma vez.</p>
     </div>
 
     <div class="panel">
@@ -690,8 +691,8 @@ function editarForm(p){
     <div class="grid-form">
       <label class="f">Protocolo<input id="ed-proto" class="mono" value="${esc(p.protocolo)}" disabled></label>
       <label class="f">Regulador<input id="ed-reg" list="regs" value="${esc(p.regulador||"")}"></label>
-      <label class="f">Entrada<input id="ed-ent" type="datetime-local" value="${esc(p.entrada||"")}"></label>
-      <label class="f">Liberação do regulador<input id="ed-regl" type="datetime-local" value="${esc(p.regulacao||"")}"></label>
+      <label class="f">Entrada<input id="ed-ent" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm" value="${esc(isoParaBR(p.entrada))}"></label>
+      <label class="f">Liberação do regulador<input id="ed-regl" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm" value="${esc(isoParaBR(p.regulacao))}"></label>
       <label class="f">Status<select id="ed-st">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${p.status===k?"selected":""}>${l}</option>`).join("")}</select></label>
     </div>
     ${p.resultado?`<div class="obs">${esc((RES[p.resultado]||{}).l)}${p.porte?" · "+esc(p.porte):""}${p.reducao!=null?" · redução "+brl(p.reducao):""}${errosTxt(p)?"\nErros: "+esc(errosTxt(p)):""}${p.descricaoErro?" — "+esc(p.descricaoErro):""}${p.obs?"\n"+esc(p.obs):""}</div>`:""}
@@ -702,7 +703,10 @@ function editarForm(p){
     </div>`);
   $("#ed-cancel").onclick=closeSheet;
   const rv=$("#ed-rev"); if(rv) rv.onclick=()=>revisaoForm(p,false);
-  $("#ed-ok").onclick=async()=>{ try{ await db.collection("processos").doc(p.id).update({regulador:$("#ed-reg").value.trim().toUpperCase()||null,entrada:$("#ed-ent").value||null,regulacao:$("#ed-regl").value||null,status:$("#ed-st").value}); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
+  $("#ed-ok").onclick=async()=>{
+    const ent=brParaIso($("#ed-ent").value), regl=brParaIso($("#ed-regl").value);
+    if(ent===false||regl===false){ $("#ed-msg").textContent="Data inválida. Use o formato dd/mm/aaaa hh:mm."; return; }
+    try{ await db.collection("processos").doc(p.id).update({regulador:$("#ed-reg").value.trim().toUpperCase()||null,entrada:ent,regulacao:regl,status:$("#ed-st").value}); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
   let armed=false;
   $("#ed-del").onclick=async()=>{ if(!armed){armed=true;$("#ed-del").textContent="Clique de novo para excluir";return;} try{ await db.collection("processos").doc(p.id).delete(); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
 }
@@ -750,23 +754,103 @@ document.addEventListener("change",async e=>{
 });
 $("#busca").addEventListener("input",e=>{busca=e.target.value;renderTable();});
 
+/* ---------- datas no formato da planilha (dd/mm/aaaa hh:mm) ---------- */
+const RE_DATA=/^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?)?\s*$/;
+// "" → null · inválida → false · válida → "2026-11-11T09:16"
+function brParaIso(v){
+  v=String(v||"").trim(); if(!v) return null;
+  const m=v.match(RE_DATA); if(!m) return false;
+  let [_,d,mo,y,h,mi]=m; y=+y<100?2000+ +y:+y; d=+d; mo=+mo; h=+(h||0); mi=+(mi||0);
+  const dt=new Date(y,mo-1,d,h,mi);
+  if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d||h>23||mi>59) return false;
+  const z=n=>String(n).padStart(2,"0");
+  return `${y}-${z(mo)}-${z(d)}T${z(h)}:${z(mi)}`;
+}
+function isoParaBR(v){ const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/); return m?`${m[3]}/${m[2]}/${m[1]} ${m[4]||"00"}:${m[5]||"00"}`:""; }
+// digitando só números, coloca as barras e os dois-pontos sozinho
+document.addEventListener("input",e=>{
+  const el=e.target; if(!el.classList||!el.classList.contains("dt")||e.inputType==="insertFromPaste"||(e.inputType||"").startsWith("delete")) return;
+  const dg=el.value.replace(/\D/g,"").slice(0,12); let o="";
+  for(let k=0;k<dg.length;k++){ if(k===2||k===4) o+="/"; if(k===8) o+=" "; if(k===10) o+=":"; o+=dg[k]; }
+  el.value=o;
+});
+
+/* ---------- registrar (um ou vários) ---------- */
+async function registrarUm({proto,reg,ent,regl}){
+  proto=normProto(proto); const id=docId(proto); reg=(reg||"").trim().toUpperCase();
+  if(!id) throw {code:"erro",message:"protocolo inválido"};
+  const ex=all.find(x=>x.id===id);
+  if(ex){
+    await db.collection("processos").doc(id).update({regulador:reg||ex.regulador,entrada:ent||ex.entrada||null,regulacao:regl||ex.regulacao||null});
+    return {proto,novo:false,status:ex.status};
+  }
+  await db.collection("processos").doc(id).set({protocolo:proto,regulador:reg,entrada:ent||null,regulacao:regl||null,status:"revisao",criadoEm:Date.now(),criadoPor:"registro"});
+  return {proto,novo:true};
+}
+function limparRegistro(){ ["#reg-proto","#reg-regulador","#reg-entrada","#reg-regulacao"].forEach(s=>$(s).value=""); $("#reg-proto").focus(); }
+
 $("#f-reg").addEventListener("submit",async e=>{
   e.preventDefault(); const m=$("#reg-msg"); m.className="msg"; m.textContent="";
   if(!db){m.className="msg err";m.textContent="Ainda conectando aos dados.";return;}
-  const proto=normProto($("#reg-proto").value), id=docId(proto), reg=$("#reg-regulador").value.trim().toUpperCase();
-  if(!id){m.className="msg err";m.textContent="Protocolo inválido.";return;}
-  const ex=all.find(x=>x.id===id);
+  const ent=brParaIso($("#reg-entrada").value), regl=brParaIso($("#reg-regulacao").value);
+  if(ent===false){m.className="msg err";m.textContent="Data de entrada inválida. Use dd/mm/aaaa hh:mm.";return;}
+  if(regl===false){m.className="msg err";m.textContent="Data de liberação inválida. Use dd/mm/aaaa hh:mm.";return;}
   try{
-    if(ex){
-      await db.collection("processos").doc(id).update({regulador:reg||ex.regulador,entrada:$("#reg-entrada").value||ex.entrada||null,regulacao:$("#reg-regulacao").value||ex.regulacao||null});
-      m.className="msg ok"; m.textContent=`Esse protocolo já existia (${STATUS[ex.status]}). Atualizei regulador e datas.`;
-    }else{
-      await db.collection("processos").doc(id).set({protocolo:proto,regulador:reg,entrada:$("#reg-entrada").value||null,regulacao:$("#reg-regulacao").value||null,status:"revisao",criadoEm:Date.now(),criadoPor:"registro"});
-      m.className="msg ok"; m.textContent=`${proto} registrado e enviado para revisão.`;
-    }
-    $("#reg-proto").value=""; $("#reg-proto").focus();
+    const r=await registrarUm({proto:$("#reg-proto").value,reg:$("#reg-regulador").value,ent,regl});
+    m.className="msg ok"; m.textContent=r.novo?`${r.proto} registrado e enviado para revisão.`:`${r.proto} já existia (${STATUS[r.status]}). Atualizei regulador e datas.`;
+    limparRegistro();
   }catch(err){ m.className="msg err"; m.textContent=errText(err); }
 });
+
+// colar linhas copiadas da planilha
+function lerLinha(txt){
+  const cels=txt.split("\t").map(c=>c.trim()).filter(c=>c!=="");
+  const o={proto:"",reg:"",datas:[]};
+  cels.forEach(c=>{
+    if(RE_DATA.test(c)) o.datas.push(brParaIso(c));
+    else if(!o.proto&&/\d{4,}/.test(c)) o.proto=c;
+    else if(!o.reg&&/^[A-Za-zÀ-ú .]+$/.test(c)&&!/^APVS$/i.test(c)) o.reg=c;
+  });
+  return {proto:o.proto,reg:o.reg,ent:o.datas[0]||null,regl:o.datas[1]||null};
+}
+$("#f-reg").addEventListener("paste",e=>{
+  const txt=(e.clipboardData||window.clipboardData).getData("text")||"";
+  const linhas=txt.replace(/\r/g,"").split("\n").filter(l=>l.trim());
+  const el=e.target;
+  if(linhas.length===1&&!txt.includes("\t")){
+    if(el.classList.contains("dt")){ const iso=brParaIso(txt); if(iso){ e.preventDefault(); el.value=isoParaBR(iso); } }
+    return;
+  }
+  e.preventDefault();
+  const itens=linhas.map(lerLinha).filter(x=>x.proto);
+  if(!itens.length){ const m=$("#reg-msg"); m.className="msg err"; m.textContent="Não encontrei protocolo no que você colou."; return; }
+  if(itens.length===1){
+    const x=itens[0];
+    $("#reg-proto").value=normProto(x.proto); if(x.reg) $("#reg-regulador").value=x.reg.toUpperCase();
+    $("#reg-entrada").value=isoParaBR(x.ent); $("#reg-regulacao").value=isoParaBR(x.regl);
+    return;
+  }
+  registrarVariosForm(itens);
+});
+function registrarVariosForm(itens){
+  openSheet(`<h3 id="ov-title">Registrar ${itens.length} processos</h3>
+    <p class="hint">Confira o que veio da planilha. Protocolos que já existem só têm regulador e datas atualizados.</p>
+    <div class="list">${itens.map(x=>`<div class="lrow" style="min-height:0"><div class="lmain"><span class="proto">${esc(normProto(x.proto))}</span>
+      <span class="lsub">${esc((x.reg||"sem regulador").toUpperCase())} · Entrada ${x.ent?isoParaBR(x.ent):"—"} · Liberação ${x.regl?isoParaBR(x.regl):"—"}</span></div>
+      ${all.find(p=>p.id===docId(x.proto))?'<span class="chip s-comunicado">Já existe</span>':""}</div>`).join("")}</div>
+    <div class="msg" id="rv-msg"></div>
+    <div class="row end"><button class="ghost" id="rv-cancel">Cancelar</button><button class="primary" id="rv-ok">Registrar ${itens.length}</button></div>`);
+  $("#rv-cancel").onclick=closeSheet;
+  $("#rv-ok").onclick=async()=>{
+    const b=$("#rv-ok"), m=$("#rv-msg"); b.disabled=true; let ok=0, erros=[];
+    for(const x of itens){
+      m.className="msg"; m.textContent=`Registrando ${ok+erros.length+1} de ${itens.length}…`;
+      try{ await registrarUm(x); ok++; }catch(err){ erros.push(normProto(x.proto)+": "+errText(err)); }
+    }
+    if(erros.length){ m.className="msg err"; m.textContent=`${ok} registrados. Com problema: ${erros.join(" | ")}`; b.disabled=false; return; }
+    closeSheet(); limparRegistro(); const rm=$("#reg-msg"); rm.className="msg ok"; rm.textContent=`${ok} processos registrados e enviados para revisão.`;
+  };
+}
 
 /* ---------- data (Supabase) ---------- */
 const CFG=window.ESTEIRA_CONFIG||{};
