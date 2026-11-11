@@ -656,12 +656,23 @@ function detalheForm(p){
       ${role==="gestor"?'<button id="dt-edit">Editar</button>':""}
       ${podeRev?'<button class="primary" id="dt-rev">Revisar</button>':""}
       ${podeComunicar?'<button class="primary" id="dt-com">Marcar como comunicado</button>':""}
-    </div>`);
+    </div>
+    ${role==="gestor"?'<div class="dl"><button class="dl-row danger" id="dt-del" style="justify-content:center">Excluir protocolo</button></div>':""}`);
   $("#dt-close").onclick=closeSheet;
   $("#dt-copy").onclick=async()=>{ try{ await navigator.clipboard.writeText(p.protocolo); $("#dt-copy").textContent="Copiado"; }catch(e){ $("#dt-copy").textContent=p.protocolo; } };
   if($("#dt-edit")) $("#dt-edit").onclick=()=>editarForm(p);
   if($("#dt-rev")) $("#dt-rev").onclick=()=>revisaoForm(p,false);
   if($("#dt-com")) $("#dt-com").onclick=()=>comunicarForm(p);
+  if($("#dt-del")){
+    let armado=false;
+    $("#dt-del").onclick=async()=>{
+      const b=$("#dt-del");
+      if(!armado){ armado=true; b.textContent="Toque de novo para excluir de vez"; b.style.background="var(--red-bright)"; b.style.color="#fff"; return; }
+      b.disabled=true; b.textContent="Excluindo…";
+      try{ await db.collection("processos").doc(p.id).delete(); closeSheet(); mostrarToast("Protocolo excluído",p.protocolo,null); }
+      catch(e){ b.disabled=false; $("#dt-msg").textContent=errText(e); }
+    };
+  }
 }
 
 function comunicarForm(p){
