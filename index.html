@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Esteira APVS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+/* Layout: one working column, tabs per person (registro → revisão → comunicação → planilha); cards for queues, a table for the full register. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#eaeeec; --line:#d5dcd9;
+  --ink:#16201d; --muted:#5b6a65; --accent:#0f6e62; --accent-ink:#ffffff; --accent-soft:#d9eeea;
+  --amber:#a8650a; --amber-soft:#fbefd9; --red:#b3372e; --red-soft:#f8e1de;
+  --blue:#1f5fa8; --blue-soft:#dfeaf8; --green:#2e7d3a; --green-soft:#e0f1e2;
+  --shadow:0 1px 2px rgba(20,40,35,.06),0 4px 14px rgba(20,40,35,.06);
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111816; --surface:#18211e; --surface-2:#202b28; --line:#2e3b37;
+  --ink:#e6eeeb; --muted:#9aaba5; --accent:#4cc2b0; --accent-ink:#06201c; --accent-soft:#163a35;
+  --amber:#f0b35a; --amber-soft:#3a2c14; --red:#f08a80; --red-soft:#3d1e1b;
+  --blue:#8bb8ef; --blue-soft:#18293d; --green:#86d08f; --green-soft:#183020;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --surface:#18211e; --surface-2:#202b28; --line:#2e3b37;
+  --ink:#e6eeeb; --muted:#9aaba5; --accent:#4cc2b0; --accent-ink:#06201c; --accent-soft:#163a35;
+  --amber:#f0b35a; --amber-soft:#3a2c14; --red:#f08a80; --red-soft:#3d1e1b;
+  --blue:#8bb8ef; --blue-soft:#18293d; --green:#86d08f; --green-soft:#183020;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-size:24px;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.flow{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.flow b{color:var(--ink);font-weight:500}
+nav.tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:10px;overflow-x:auto}
+nav.tabs a{flex:1 0 auto;text-align:center;padding:9px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px;white-space:nowrap;display:flex;gap:8px;align-items:center;justify-content:center}
+nav.tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+nav.tabs a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.count{font-family:var(--f-mono);font-size:12px;background:var(--line);color:var(--ink);border-radius:20px;padding:0 7px;min-width:22px}
+.count.hot{background:var(--accent);color:var(--accent-ink)}
+.banner{padding:10px 14px;border-radius:8px;font-size:14px;background:var(--amber-soft);color:var(--amber)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.panel h2{font-size:16px;margin:0;display:flex;gap:8px;align-items:center}
+.panel h2 .count{font-weight:500}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:0}
+input,select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;text-transform:none;letter-spacing:0;font-weight:400}
+textarea{min-height:64px;resize:vertical}
+input.mono{font-family:var(--f-mono)}
+button{font:inherit;font-size:14px;font-weight:600;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.warn{color:var(--red);border-color:var(--red-soft)}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:6px 8px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.end{justify-content:flex-end}
+.msg{font-size:13px;min-height:1em}
+.msg.ok{color:var(--green)} .msg.err{color:var(--red)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.click{cursor:pointer;text-align:left;font-weight:400}
+.card.click:hover{border-color:var(--accent)}
+.proto{font-family:var(--f-mono);font-weight:600;font-size:14px;word-break:break-all}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-revisao{background:var(--amber-soft);color:var(--amber)}
+.s-devolvido{background:var(--red-soft);color:var(--red)}
+.s-comunicar{background:var(--blue-soft);color:var(--blue)}
+.s-comunicado{background:var(--green-soft);color:var(--green)}
+.res{font-weight:600;font-size:15px}
+.money{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:18px}
+.money small{font-family:var(--f-body);font-weight:500;font-size:12px;color:var(--muted);display:block;text-transform:uppercase;letter-spacing:.04em}
+.obs{font-size:14px;background:var(--surface-2);border-radius:6px;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{color:var(--muted);font-size:14px;padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font-weight:500;padding:6px 11px;border-radius:20px;font-size:13px}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface-2);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-mono)}
+tbody tr{cursor:pointer} tbody tr:hover td{background:var(--accent-soft)}
+.miss{color:var(--amber);font-weight:600}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.overlay{position:fixed;inset:0;background:rgba(10,20,18,.45);display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 24px max(12px,env(safe-area-inset-left,0px));overflow-y:auto;z-index:20}
+.sheet{background:var(--surface);border-radius:14px;width:100%;max-width:560px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.sheet h3{margin:0;font-size:18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--surface-2);border-radius:10px;padding:12px}
+.stat .v{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+.check input{width:auto}
+.sync{font-size:12px;color:var(--muted)}
+@media (max-width:520px){h1{font-size:21px}.money{font-size:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Esteira APVS</h1>
+      <div class="sub">Gestão Segura · revisão e comunicação dos processos APVS</div>
+    </div>
+    <div class="row" id="userbox" hidden><span class="sync" id="user-email"></span><button class="ghost" id="btn-sair" type="button">Sair</button></div>
+  </header>
+
+  <nav class="tabs" aria-label="Etapas">
+    <a href="#registro" data-tab="registro">Registro <span class="count" id="c-registro">0</span></a>
+    <a href="#revisao" data-tab="revisao">Revisão <span class="count" id="c-revisao">0</span></a>
+    <a href="#comunicacao" data-tab="comunicacao">Comunicação <span class="count" id="c-comunicacao">0</span></a>
+    <a href="#planilha" data-tab="planilha">Planilha</a>
+    <a href="#pessoas" data-tab="pessoas">Pessoas <span class="count" id="c-pessoas">0</span></a>
+  </nav>
+
+  <div class="banner" id="banner" hidden></div>
+  <div class="sync" id="sync">Conectando aos dados…</div>
+
+  <!-- REGISTRO -->
+  <section data-view="registro" class="view">
+    <div class="panel">
+      <h2>Registrar processo</h2>
+      <p class="hint">Quando o regulador liberar, registre aqui. O processo cai na fila de revisão do Cristiano.</p>
+      <form id="f-reg" class="grid-form" autocomplete="off">
+        <label class="f">Protocolo<input id="reg-proto" class="mono" required placeholder="A202611S27I 249805-0APVS"></label>
+        <label class="f">Regulador<input id="reg-regulador" list="regs" required placeholder="EMERSON"></label>
+        <label class="f">Entrada<input id="reg-entrada" type="datetime-local"></label>
+        <label class="f">Liberação do regulador<input id="reg-regulacao" type="datetime-local"></label>
+        <div class="row"><button class="primary" type="submit" id="reg-btn">Registrar</button></div>
+      </form>
+      <div class="msg" id="reg-msg" role="status"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Todos os processos <span class="count" id="c-all">0</span></h2>
+      <div class="row" style="justify-content:space-between">
+        <div class="filters" id="filters"></div>
+        <input id="busca" placeholder="Buscar protocolo ou regulador" style="max-width:260px">
+      </div>
+      <div class="tablebox">
+        <table>
+          <thead><tr><th>Protocolo</th><th>Regulador</th><th>Entrada</th><th>Liberação</th><th>Status</th><th>Resultado</th><th>Erros</th><th class="num">Redução</th><th>Revisado</th></tr></thead>
+          <tbody id="tb-all"></tbody>
+        </table>
+      </div>
+      <p class="hint">Clique numa linha para corrigir datas ou dados. <span class="miss">Faltam datas</span> aparece quando o Cristiano registrou um protocolo que você ainda não tinha lançado.</p>
+    </div>
+  </section>
+
+  <!-- REVISAO -->
+  <section data-view="revisao" class="view" hidden>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2>Aguardando revisão <span class="count" id="c-rev2">0</span></h2>
+        <button class="primary" id="btn-novo">+ Novo protocolo</button>
+      </div>
+      <p class="hint">Toque no processo para registrar a revisão. Se o protocolo não estiver na lista, use “Novo protocolo”.</p>
+      <div class="cards" id="list-revisao"></div>
+    </div>
+    <div class="panel">
+      <h2>Devolvidos ao regulador <span class="count" id="c-dev">0</span></h2>
+      <p class="hint">Quando o processo voltar ajustado, toque nele para concluir a revisão.</p>
+      <div class="cards" id="list-devolvido"></div>
+    </div>
+  </section>
+
+  <!-- COMUNICACAO -->
+  <section data-view="comunicacao" class="view" hidden>
+    <div class="panel">
+      <h2>A comunicar <span class="count" id="c-com2">0</span></h2>
+      <p class="hint">Revisões concluídas pelo Cristiano, das mais antigas para as mais novas.</p>
+      <div class="cards" id="list-comunicar"></div>
+    </div>
+    <div class="panel">
+      <h2>Comunicados nos últimos 7 dias</h2>
+      <div class="cards" id="list-comunicado"></div>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section data-view="login" class="view" hidden>
+    <div class="panel" style="max-width:420px;margin:0 auto;width:100%">
+      <h2>Entrar</h2>
+      <form id="f-login" style="display:flex;flex-direction:column;gap:12px">
+        <label class="f">E-mail<input id="lg-email" type="email" autocomplete="username" required></label>
+        <label class="f">Senha<input id="lg-senha" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit" id="lg-btn">Entrar</button>
+      </form>
+      <div class="msg err" id="lg-msg" role="status"></div>
+      <p class="hint">Não tem usuário ou esqueceu a senha? Fale com a Lidi.</p>
+    </div>
+  </section>
+
+  <!-- AGUARDANDO ACESSO -->
+  <section data-view="aguardando" class="view" hidden>
+    <div class="panel"><h2 id="ag-titulo">Carregando seu acesso…</h2><p class="hint" id="ag-texto">Só um instante.</p></div>
+  </section>
+
+  <!-- PESSOAS -->
+  <section data-view="pessoas" class="view" hidden>
+    <div class="panel">
+      <h2>Quem vê o quê</h2>
+      <p class="hint">Cada pessoa aparece aqui assim que você cria o usuário dela no Supabase. Escolha o que ela pode ver.</p>
+      <div id="list-pessoas" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </section>
+
+  <!-- PLANILHA -->
+  <section data-view="planilha" class="view" hidden>
+    <div class="panel">
+      <h2>Baixar para a sua planilha</h2>
+      <p class="hint">Entram os processos com revisão concluída no período, pela data da revisão.</p>
+      <div class="grid-form">
+        <label class="f">De<input type="date" id="ex-de"></label>
+        <label class="f">Até<input type="date" id="ex-ate"></label>
+        <label class="check"><input type="checkbox" id="ex-novos" checked> Só o que ainda não baixei</label>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="st-n">0</div><div class="l">Processos</div></div>
+        <div class="stat"><div class="v" id="st-red">R$ 0,00</div><div class="l">Redução obtida</div></div>
+        <div class="stat"><div class="v" id="st-dias">0</div><div class="l">Dias com revisão</div></div>
+        <div class="stat"><div class="v" id="st-miss">0</div><div class="l">Sem datas de entrada</div></div>
+      </div>
+      <div class="tablebox">
+        <table style="min-width:420px">
+          <thead><tr><th>Data</th><th class="num">Processos do dia</th><th class="num">Redução obtida</th></tr></thead>
+          <tbody id="tb-dias"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button class="primary" id="btn-export">Baixar planilha (.xlsx)</button>
+        <span class="msg" id="ex-msg" role="status"></span>
+      </div>
+      <p class="hint">O arquivo tem três abas: <b>BASE DE DADOS</b> (mesmas colunas B–P da sua), <b>APVS DIÁRIO</b> (data, processos do dia e redução, nas colunas C–F da aba APVS) e <b>DETALHE</b> (tudo o que foi registrado). As colunas de fórmula vêm em branco: no Excel, cole com <b>Colar especial → Ignorar em branco</b> para não apagar suas fórmulas.</p>
+    </div>
+  </section>
+</div>
+
+<datalist id="regs"><option value="EMERSON"><option value="TIAGO"><option value="SAYMOM"><option value="MODESTO"><option value="TAVARES"><option value="VICTOR"><option value="ALESTHER"></datalist>
+
+<div class="overlay" id="ov" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ov-title" id="sheet"></div>
+</div>
+
+<script>
+(function(){
+const RESULTADOS=[
+  {k:"ok",l:"Auditoria OK"},
+  {k:"red_pc",l:"Redução em peças",red:true},
+  {k:"red_mo",l:"Redução em M.O.",red:true},
+  {k:"red_pcmo",l:"Redução em peças e M.O.",red:true},
+  {k:"est_pc",l:"Estimativa em peças",com:true},
+  {k:"inconc",l:"Auditoria inconclusiva",com:true},
+];
+const RES=Object.fromEntries(RESULTADOS.map(r=>[r.k,r]));
+const PORTES=["Pequeno","Médio","Grande"];
+const ERROS=["Erro de Peça","Erro de MO","Erro de Valor","Incompleto","Montagem","Horas","Outro"];
+const SEM_ERRO="Sem Erro";
+const errosTxt=p=>p.erro?(p.erro+(p.erro2?" + "+p.erro2:"")):"";
+const auditoriaDe=p=>!p.erro?"":(p.erro===SEM_ERRO?"Aprovado":"Reprovado");
+const STATUS={revisao:"Aguardando revisão",devolvido:"Devolvido",comunicar:"A comunicar",comunicado:"Comunicado"};
+
+let db=null, canWrite=true, all=[], filtro="todos", busca="";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- helpers ---------- */
+function normProto(p){return String(p||"").toUpperCase().replace(/\s+/g," ").trim();}
+function docId(p){return normProto(p).replace(/ /g,"_").replace(/[^A-Z0-9_\-.~:@+]/g,"");}
+function parseBRL(v){
+  let s=String(v??"").replace(/R\$|\s/gi,"");
+  if(!s) return null;
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");
+  const n=Number(s); return isFinite(n)?Math.round(n*100)/100:null;
+}
+const brl=n=>n==null?"—":n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const brlIn=n=>n==null?"":n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+function fmtLocal(s){ if(!s) return ""; const d=new Date(s); return isNaN(d)?"":d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+function fmtTs(ms){
+  if(!ms) return ""; const d=new Date(ms), now=new Date();
+  const hm=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=(day(now)-day(d))/864e5;
+  if(diff===0) return "hoje "+hm; if(diff===1) return "ontem "+hm;
+  return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+hm;
+}
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const statusChip=s=>`<span class="chip s-${s}">${STATUS[s]||s}</span>`;
+const faltaData=p=>!p.entrada||!p.regulacao;
+
+/* ---------- tabs ---------- */
+const ACESSO={gestor:["registro","revisao","comunicacao","planilha","pessoas"],revisao:["revisao"],comunicacao:["comunicacao","revisao"]};
+const PAPEIS=[["","Sem acesso"],["revisao","Revisão (só a parte do revisor)"],["comunicacao","Comunicação (comunicação + ver revisão)"],["gestor","Tudo"]];
+let role=null, isOwner=false, myId=null, pessoas=[], session=null;
+const podeRevisar=()=>role==="gestor"||role==="revisao";
+function route(){
+  const allowed=role?ACESSO[role]:[];
+  const h=location.hash.slice(1);
+  const t=!session?"login":allowed.length?(allowed.includes(h)?h:allowed[0]):"aguardando";
+  document.querySelectorAll("[data-view]").forEach(v=>v.hidden=v.dataset.view!==t);
+  const nav=document.querySelector("nav.tabs"); nav.hidden=allowed.length<2;
+  document.querySelectorAll("nav.tabs a").forEach(a=>{ a.hidden=!allowed.includes(a.dataset.tab); if(a.dataset.tab===t) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
+  $("#btn-novo").hidden=!podeRevisar();
+}
+function aguardando(titulo,texto){ $("#ag-titulo").textContent=titulo; $("#ag-texto").textContent=texto; }
+function setRole(r){ role=r; route(); render(); }
+addEventListener("hashchange",route); route();
+
+/* ---------- render ---------- */
+function render(){
+  const by=s=>all.filter(p=>p.status===s);
+  const rev=by("revisao").sort((a,b)=>(a.regulacao||"").localeCompare(b.regulacao||"")||(a.criadoEm||0)-(b.criadoEm||0));
+  const dev=by("devolvido").sort((a,b)=>(a.devolvidoEm||0)-(b.devolvidoEm||0));
+  const com=by("comunicar").sort((a,b)=>(a.revisadoEm||0)-(b.revisadoEm||0));
+  const weekAgo=Date.now()-7*864e5;
+  const comd=by("comunicado").filter(p=>(p.comunicadoEm||0)>=weekAgo).sort((a,b)=>(b.comunicadoEm||0)-(a.comunicadoEm||0));
+
+  setCount("c-registro",all.filter(faltaData).length,true);
+  setCount("c-revisao",rev.length+dev.length,true);
+  setCount("c-comunicacao",com.length,true);
+  $("#c-rev2").textContent=rev.length; $("#c-dev").textContent=dev.length; $("#c-com2").textContent=com.length; $("#c-all").textContent=all.length;
+
+  $("#list-revisao").innerHTML=rev.length?rev.map(cardRevisao).join(""):`<div class="empty">Nenhum processo esperando revisão.</div>`;
+  $("#list-devolvido").innerHTML=dev.length?dev.map(cardRevisao).join(""):`<div class="empty">Nenhum processo devolvido.</div>`;
+  $("#list-comunicar").innerHTML=com.length?com.map(cardComunicar).join(""):`<div class="empty">Tudo comunicado. Novas revisões aparecem aqui sozinhas.</div>`;
+  $("#list-comunicado").innerHTML=comd.length?comd.map(cardComunicado).join(""):`<div class="empty">Nada comunicado nos últimos 7 dias.</div>`;
+  renderFilters(); renderTable(); renderExport();
+}
+function setCount(id,n,hot){const el=$("#"+id); el.textContent=n; el.classList.toggle("hot",hot&&n>0);}
+
+function cardRevisao(p){
+  if(!podeRevisar()) return `<div class="card">
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
+    <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}</div>
+    ${p.status==="devolvido"&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
+  </div>`;
+  return `<button class="card click" data-act="revisar" data-id="${esc(p.id)}">
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
+    <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}${p.porte?`<span>Porte <b>${esc(p.porte)}</b></span>`:""}</div>
+    ${p.status==="devolvido"&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
+  </button>`;
+}
+function valorDestaque(p){
+  const r=RES[p.resultado]||{};
+  const parts=[];
+  if(r.red&&p.reducao!=null) parts.push(`<div class="money"><small>Redução obtida</small>${brl(p.reducao)}</div>`);
+  if(p.valorComunicar!=null) parts.push(`<div class="money"><small>Valor a comunicar</small>${brl(p.valorComunicar)}</div>`);
+  if(p.valorAprovado!=null) parts.push(`<div class="money"><small>Valor aprovado</small>${brl(p.valorAprovado)}</div>`);
+  return parts.length?`<div class="row" style="gap:20px">${parts.join("")}</div>`:"";
+}
+function cardComunicar(p){
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span><span class="chip s-comunicar">${esc(p.porte||"")}</span></div>
+    <div class="res">${esc((RES[p.resultado]||{}).l||"—")}</div>
+    ${valorDestaque(p)}
+    ${p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
+    <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span><span>Revisado <b>${fmtTs(p.revisadoEm)}</b></span></div>
+    <div class="row end"><button class="primary" data-act="comunicar" data-id="${esc(p.id)}" ${canWrite?"":"disabled"}>Marcar como comunicado</button></div>
+  </div>`;
+}
+function cardComunicado(p){
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip("comunicado")}</div>
+    <div class="meta"><span><b>${esc((RES[p.resultado]||{}).l||"—")}</b></span><span>Comunicado <b>${fmtTs(p.comunicadoEm)}</b></span></div>
+    ${p.notaComunicacao?`<div class="obs">${esc(p.notaComunicacao)}</div>`:""}
+    <div class="row end"><button class="ghost" data-act="desfazer" data-id="${esc(p.id)}" ${canWrite?"":"disabled"}>Desfazer</button></div>
+  </div>`;
+}
+
+const FILTROS=[["todos","Todos"],["revisao","Aguardando revisão"],["devolvido","Devolvidos"],["comunicar","A comunicar"],["comunicado","Comunicados"],["faltam","Faltam datas"]];
+function renderFilters(){
+  $("#filters").innerHTML=FILTROS.map(([k,l])=>`<button aria-pressed="${filtro===k}" data-filtro="${k}">${l}</button>`).join("");
+}
+function renderTable(){
+  const q=busca.trim().toUpperCase();
+  let rows=all.filter(p=>filtro==="todos"||(filtro==="faltam"?faltaData(p):p.status===filtro));
+  if(q) rows=rows.filter(p=>(p.protocolo+" "+(p.regulador||"")).toUpperCase().includes(q));
+  rows.sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  $("#tb-all").innerHTML=rows.length?rows.slice(0,400).map(p=>`<tr data-act="editar" data-id="${esc(p.id)}">
+    <td class="proto" style="font-size:13px">${esc(p.protocolo)}</td><td>${esc(p.regulador||"")}</td>
+    <td>${p.entrada?fmtLocal(p.entrada):'<span class="miss">Falta</span>'}</td>
+    <td>${p.regulacao?fmtLocal(p.regulacao):'<span class="miss">Falta</span>'}</td>
+    <td>${statusChip(p.status)}</td><td>${esc((RES[p.resultado]||{}).l||"")}</td><td>${esc(errosTxt(p))}</td>
+    <td class="num">${p.reducao!=null?brl(p.reducao):""}</td><td>${fmtTs(p.revisadoEm)}</td></tr>`).join("")
+    :`<tr><td colspan="9" class="empty" style="cursor:default">Nenhum processo aqui ainda. Registre o primeiro no formulário acima.</td></tr>`;
+}
+
+/* ---------- export ---------- */
+(function initDates(){const n=new Date();$("#ex-de").value=ymd(new Date(n.getFullYear(),n.getMonth(),1));$("#ex-ate").value=ymd(n);})();
+function exportRows(){
+  const de=$("#ex-de").value, ate=$("#ex-ate").value, novos=$("#ex-novos").checked;
+  return all.filter(p=>(p.status==="comunicar"||p.status==="comunicado")&&p.revisadoEm)
+    .filter(p=>{const d=ymd(new Date(p.revisadoEm)); return (!de||d>=de)&&(!ate||d<=ate);})
+    .filter(p=>!novos||!p.exportadoEm)
+    .sort((a,b)=>a.revisadoEm-b.revisadoEm);
+}
+function porDia(rows){
+  const m=new Map();
+  rows.forEach(p=>{const k=ymd(new Date(p.revisadoEm)); const o=m.get(k)||{n:0,red:0}; o.n++; o.red+=p.reducao||0; m.set(k,o);});
+  return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function renderExport(){
+  const rows=exportRows(), dias=porDia(rows);
+  $("#st-n").textContent=rows.length;
+  $("#st-red").textContent=brl(rows.reduce((s,p)=>s+(p.reducao||0),0));
+  $("#st-dias").textContent=dias.length;
+  $("#st-miss").textContent=rows.filter(faltaData).length;
+  $("#tb-dias").innerHTML=dias.length?dias.map(([k,o])=>`<tr style="cursor:default"><td>${k.split("-").reverse().join("/")}</td><td class="num">${o.n}</td><td class="num">${brl(Math.round(o.red*100)/100)}</td></tr>`).join("")
+    :`<tr><td colspan="3" class="empty" style="cursor:default">Nenhuma revisão concluída nesse período${$("#ex-novos").checked?" que ainda não tenha sido baixada":""}.</td></tr>`;
+  $("#btn-export").disabled=!rows.length;
+}
+["#ex-de","#ex-ate","#ex-novos"].forEach(s=>$(s).addEventListener("change",renderExport));
+
+const toDate=s=>s?new Date(s):null;
+const dayDate=ms=>{const d=new Date(ms);return new Date(d.getFullYear(),d.getMonth(),d.getDate());};
+function buildWorkbook(rows){
+  const wb=XLSX.utils.book_new();
+  const obsTxt=p=>[p.erro2?"2º erro: "+p.erro2:"",p.descricaoErro||""].filter(Boolean).join(" · ");
+  // BASE DE DADOS: colunas A..P, cabeçalho igual ao da sua planilha
+  const base=[["","PROTOCOLO","ENTRADA","REGULAÇÃO","REGULADOR","ASSOCIAÇÃO","HRS USADAS","SLA (H)","STATUS SLA","AUDITORIA","TIPO ERRO","PORTE","VALOR OFICINA (GABRIEL)","VALOR APROVADO","VENCIMENTO","OBSERVAÇÕES"]];
+  rows.forEach(p=>base.push(["",p.protocolo,toDate(p.entrada),toDate(p.regulacao),(p.regulador||"").toUpperCase(),"APVS",null,null,null,auditoriaDe(p)||null,p.erro||null,p.porte||null,null,p.valorAprovado??null,null,obsTxt(p)]));
+  const ws1=XLSX.utils.aoa_to_sheet(base,{cellDates:true});
+  fmtCol(ws1,["C","D"],rows.length,"dd/mm/yyyy hh:mm"); fmtCol(ws1,["N"],rows.length,'"R$" #,##0.00');
+  ws1["!cols"]=[{wch:2},{wch:28},{wch:16},{wch:16},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:9},{wch:12},{wch:14},{wch:10},{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws1,"BASE DE DADOS");
+  // APVS DIÁRIO: colunas C..F como na aba APVS
+  const dia=[["","","DATA","PROCESSOS DO DIA","ACUMULADO (fórmula)","REDUÇÃO OBTIDA (R$)"]];
+  porDia(rows).forEach(([k,o])=>{const [y,m,d]=k.split("-").map(Number); dia.push(["","",new Date(y,m-1,d),o.n,null,Math.round(o.red*100)/100]);});
+  const ws2=XLSX.utils.aoa_to_sheet(dia,{cellDates:true});
+  fmtCol(ws2,["C"],dia.length-1,"dd/mm/yyyy"); fmtCol(ws2,["F"],dia.length-1,'"R$" #,##0.00');
+  ws2["!cols"]=[{wch:2},{wch:2},{wch:12},{wch:18},{wch:18},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws2,"APVS DIÁRIO");
+  // DETALHE
+  const det=[["PROTOCOLO","REGULADOR","ENTRADA","LIBERAÇÃO REGULADOR","PORTE","RESULTADO","REDUÇÃO OBTIDA (R$)","VALOR APROVADO (R$)","VALOR A COMUNICAR (R$)","OBSERVAÇÃO DA REVISÃO","REVISADO EM","STATUS","COMUNICADO EM","NOTA DA COMUNICAÇÃO","ERROS","DESCRIÇÃO DO ERRO"]];
+  rows.forEach(p=>det.push([p.protocolo,(p.regulador||"").toUpperCase(),toDate(p.entrada),toDate(p.regulacao),p.porte||"",(RES[p.resultado]||{}).l||"",p.reducao??null,p.valorAprovado??null,p.valorComunicar??null,p.obs||"",p.revisadoEm?new Date(p.revisadoEm):null,STATUS[p.status]||"",p.comunicadoEm?new Date(p.comunicadoEm):null,p.notaComunicacao||"",errosTxt(p),p.descricaoErro||""]));
+  const ws3=XLSX.utils.aoa_to_sheet(det,{cellDates:true});
+  fmtCol(ws3,["C","D","K","M"],rows.length,"dd/mm/yyyy hh:mm"); fmtCol(ws3,["G","H","I"],rows.length,'"R$" #,##0.00');
+  ws3["!cols"]=[{wch:28},{wch:12},{wch:16},{wch:18},{wch:9},{wch:24},{wch:14},{wch:14},{wch:14},{wch:40},{wch:16},{wch:13},{wch:16},{wch:30},{wch:24},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws3,"DETALHE");
+  return XLSX.write(wb,{type:"array",bookType:"xlsx"});
+}
+function fmtCol(ws,cols,n,z){cols.forEach(c=>{for(let r=2;r<=n+1;r++){const cell=ws[c+r]; if(cell&&cell.v!=null) cell.z=z;}});}
+
+$("#btn-export").addEventListener("click",async()=>{
+  const msg=$("#ex-msg"); msg.className="msg"; msg.textContent="";
+  const rows=exportRows(); if(!rows.length) return;
+  if(typeof XLSX==="undefined"){msg.className="msg err";msg.textContent="O gerador de planilha não carregou. Recarregue a página e tente de novo.";return;}
+  const de=$("#ex-de").value.split("-").reverse().join("-"), ate=$("#ex-ate").value.split("-").reverse().join("-");
+  const blob=new Blob([buildWorkbook(rows)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`APVS_${de}_a_${ate}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  msg.textContent="Marcando como baixados…";
+  const ids=rows.map(p=>p.id), agora=new Date().toISOString();
+  for(let i=0;i<ids.length;i+=100){
+    const {error}=await sb.from("processos").update({exportado_em:agora}).in("id",ids.slice(i,i+100));
+    if(error){ msg.className="msg err"; msg.textContent="A planilha foi baixada, mas não consegui marcar os processos como baixados."; return; }
+  }
+  msg.className="msg ok"; msg.textContent=`${rows.length} processos baixados.`;
+});
+
+/* ---------- modal ---------- */
+function openSheet(html){ $("#sheet").innerHTML=html; $("#ov").hidden=false; const f=$("#sheet").querySelector("input,select,textarea,button"); f&&f.focus(); }
+function closeSheet(){ $("#ov").hidden=true; $("#sheet").innerHTML=""; }
+$("#ov").addEventListener("click",e=>{ if(e.target.id==="ov") closeSheet(); });
+addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("#ov").hidden) closeSheet(); });
+
+function revisaoForm(p,novo){
+  const st={porte:p?.porte||"",resultado:p?.resultado||"",erro:p?.erro||"",erro2:p?.erro2||""};
+  openSheet(`
+    <h3 id="ov-title">${novo?"Novo protocolo":"Registrar revisão"}</h3>
+    ${novo?`<div class="grid-form">
+      <label class="f">Protocolo<input id="rv-proto" class="mono" placeholder="A202611S27I 249805-0APVS"></label>
+      <label class="f">Regulador<input id="rv-reg" list="regs" placeholder="EMERSON"></label></div>
+      <p class="hint">As datas de entrada e liberação a Lidi completa depois.</p>`
+      :`<div><div class="proto">${esc(p.protocolo)}</div><div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span></div></div>`}
+    <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="hint" style="font-weight:600">Porte</span>
+      <div class="seg" id="rv-porte">${PORTES.map(x=>`<button type="button" data-v="${x}" aria-pressed="${st.porte===x}">${x}</button>`).join("")}</div></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><span class="hint" style="font-weight:600">Resultado</span>
+      <div class="seg" id="rv-res">${RESULTADOS.map(r=>`<button type="button" data-v="${r.k}" aria-pressed="${st.resultado===r.k}">${r.l}</button>`).join("")}</div></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><span class="hint" style="font-weight:600">Erro do regulador</span>
+      <div class="seg" id="rv-err">${[SEM_ERRO,...ERROS].map(x=>`<button type="button" data-v="${x}" aria-pressed="${st.erro===x}">${x}</button>`).join("")}</div></div>
+    <label class="f" id="w-err2">Segundo erro · opcional, vai para as observações<select id="rv-err2"></select></label>
+    <label class="f" id="w-desc">Descrição do erro<textarea id="rv-desc" placeholder="Ex.: faltou carga de gás; não contemplou o parabarro">${esc(p?.descricaoErro||"")}</textarea></label>
+    <div class="grid-form">
+      <label class="f" id="w-red">Redução obtida (R$)<input id="rv-red" inputmode="decimal" value="${brlIn(p?.reducao)}" placeholder="1.250,00"></label>
+      <label class="f" id="w-com">Valor a comunicar (R$)<input id="rv-com" inputmode="decimal" value="${brlIn(p?.valorComunicar)}" placeholder="4.561,75"></label>
+      <label class="f">Valor aprovado (R$) · opcional<input id="rv-apr" inputmode="decimal" value="${brlIn(p?.valorAprovado)}"></label>
+    </div>
+    <label class="f">Observação<textarea id="rv-obs" placeholder="Ex.: sobre a M.O. não há aceite do valor aprovado pela reguladora">${esc(p?.obs||"")}</textarea></label>
+    <div class="msg err" id="rv-msg"></div>
+    <div class="row end">
+      <button class="ghost" type="button" id="rv-cancel">Cancelar</button>
+      <button class="warn" type="button" id="rv-dev">Devolver ao regulador</button>
+      <button class="primary" type="button" id="rv-ok">Concluir revisão</button>
+    </div>`);
+  const sync=()=>{ const r=RES[st.resultado]||{}; $("#w-red").hidden=!r.red; $("#w-com").hidden=!r.com; };
+  const syncErr=()=>{
+    $("#rv-err").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",st.erro===x.dataset.v));
+    const comErro=!!st.erro&&st.erro!==SEM_ERRO;
+    if(!comErro||st.erro2===st.erro) st.erro2="";
+    $("#rv-err2").innerHTML=`<option value="">Nenhum</option>`+ERROS.filter(x=>x!==st.erro).map(x=>`<option ${st.erro2===x?"selected":""}>${x}</option>`).join("");
+    $("#w-err2").hidden=!comErro; $("#w-desc").hidden=!comErro; };
+  syncErr();
+  $("#rv-err").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.erro=b.dataset.v;syncErr();});
+  $("#rv-err2").addEventListener("change",e=>{st.erro2=e.target.value;});
+  sync();
+  $("#rv-porte").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.porte=b.dataset.v;$("#rv-porte").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));});
+  $("#rv-res").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.resultado=b.dataset.v;$("#rv-res").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));sync();});
+  $("#rv-cancel").onclick=closeSheet;
+  const salvar=async(devolver)=>{
+    const m=$("#rv-msg"); m.textContent="";
+    let target=p;
+    if(novo){
+      const proto=normProto($("#rv-proto").value), reg=$("#rv-reg").value.trim().toUpperCase();
+      if(!proto||!docId(proto)){m.textContent="Informe o protocolo.";return;}
+      if(!reg){m.textContent="Informe o regulador.";return;}
+      const id=docId(proto); target=all.find(x=>x.id===id)||{id,protocolo:proto,regulador:reg,criadoEm:Date.now(),criadoPor:"revisao",status:"revisao"};
+      if(!target.regulador) target.regulador=reg;
+    }
+    if(!devolver){
+      if(!st.porte){m.textContent="Escolha o porte.";return;}
+      if(!st.resultado){m.textContent="Escolha o resultado.";return;}
+      if(!st.erro){m.textContent="Marque o erro do regulador, ou “Sem Erro”.";return;}
+    }
+    const r=RES[st.resultado]||{};
+    const body={...target,
+      porte:st.porte||null, resultado:st.resultado||null,
+      reducao:r.red?parseBRL($("#rv-red").value):null,
+      valorComunicar:r.com?parseBRL($("#rv-com").value):null,
+      valorAprovado:parseBRL($("#rv-apr").value),
+      obs:$("#rv-obs").value.trim()||null,
+      erro:st.erro||null,
+      erro2:st.erro&&st.erro!==SEM_ERRO?(st.erro2||null):null,
+      descricaoErro:st.erro&&st.erro!==SEM_ERRO?($("#rv-desc").value.trim()||null):null};
+    if(devolver){ body.status="devolvido"; body.devolvidoEm=Date.now(); if(!body.obs){m.textContent="Escreva na observação o que precisa ser ajustado.";return;} }
+    else { body.status="comunicar"; body.revisadoEm=Date.now(); body.exportadoEm=null; body.comunicadoEm=null; }
+    delete body.id;
+    try{ await db.collection("processos").doc(target.id).set(body); closeSheet(); }
+    catch(e){ m.textContent=errText(e); }
+  };
+  $("#rv-ok").onclick=()=>salvar(false);
+  $("#rv-dev").onclick=()=>salvar(true);
+  if(novo) $("#rv-proto").addEventListener("change",()=>{const ex=all.find(x=>x.id===docId($("#rv-proto").value)); if(ex){ $("#rv-reg").value=ex.regulador||""; $("#rv-msg").textContent=`Esse protocolo já está registrado (${STATUS[ex.status]}). Ao concluir, a revisão substitui a anterior.`; }});
+}
+
+function comunicarForm(p){
+  openSheet(`<h3 id="ov-title">Marcar como comunicado</h3>
+    <div><div class="proto">${esc(p.protocolo)}</div><div class="meta"><span><b>${esc((RES[p.resultado]||{}).l||"")}</b></span></div></div>
+    <label class="f">Nota (opcional)<textarea id="cm-nota" placeholder="Ex.: comunicado por e-mail ao analista da APVS"></textarea></label>
+    <div class="msg err" id="cm-msg"></div>
+    <div class="row end"><button class="ghost" id="cm-cancel">Cancelar</button><button class="primary" id="cm-ok">Confirmar</button></div>`);
+  $("#cm-cancel").onclick=closeSheet;
+  $("#cm-ok").onclick=async()=>{ try{ await db.collection("processos").doc(p.id).update({status:"comunicado",comunicadoEm:Date.now(),notaComunicacao:$("#cm-nota").value.trim()||null}); closeSheet(); }catch(e){ $("#cm-msg").textContent=errText(e); } };
+}
+
+function editarForm(p){
+  openSheet(`<h3 id="ov-title">Editar processo</h3>
+    <div class="grid-form">
+      <label class="f">Protocolo<input id="ed-proto" class="mono" value="${esc(p.protocolo)}" disabled></label>
+      <label class="f">Regulador<input id="ed-reg" list="regs" value="${esc(p.regulador||"")}"></label>
+      <label class="f">Entrada<input id="ed-ent" type="datetime-local" value="${esc(p.entrada||"")}"></label>
+      <label class="f">Liberação do regulador<input id="ed-regl" type="datetime-local" value="${esc(p.regulacao||"")}"></label>
+      <label class="f">Status<select id="ed-st">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${p.status===k?"selected":""}>${l}</option>`).join("")}</select></label>
+    </div>
+    ${p.resultado?`<div class="obs">${esc((RES[p.resultado]||{}).l)}${p.porte?" · "+esc(p.porte):""}${p.reducao!=null?" · redução "+brl(p.reducao):""}${errosTxt(p)?"\nErros: "+esc(errosTxt(p)):""}${p.descricaoErro?" — "+esc(p.descricaoErro):""}${p.obs?"\n"+esc(p.obs):""}</div>`:""}
+    <div class="msg err" id="ed-msg"></div>
+    <div class="row" style="justify-content:space-between">
+      <button class="warn" id="ed-del">Excluir</button>
+      <div class="row"><button class="ghost" id="ed-cancel">Cancelar</button>${p.resultado?`<button id="ed-rev">Editar revisão</button>`:""}<button class="primary" id="ed-ok">Salvar</button></div>
+    </div>`);
+  $("#ed-cancel").onclick=closeSheet;
+  const rv=$("#ed-rev"); if(rv) rv.onclick=()=>revisaoForm(p,false);
+  $("#ed-ok").onclick=async()=>{ try{ await db.collection("processos").doc(p.id).update({regulador:$("#ed-reg").value.trim().toUpperCase()||null,entrada:$("#ed-ent").value||null,regulacao:$("#ed-regl").value||null,status:$("#ed-st").value}); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
+  let armed=false;
+  $("#ed-del").onclick=async()=>{ if(!armed){armed=true;$("#ed-del").textContent="Clique de novo para excluir";return;} try{ await db.collection("processos").doc(p.id).delete(); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
+}
+
+function errText(e){
+  if(!e) return "Não foi possível salvar.";
+  if(e.code==="sem_permissao") return "Você não tem permissão para essa alteração. Se o processo já saiu da sua etapa, peça à Lidi.";
+  if(e.code==="duplicado") return "Esse protocolo já está registrado.";
+  if(e.code==="rede") return "Sem conexão agora. Tente de novo em alguns segundos.";
+  return "Não foi possível salvar"+(e.message?": "+e.message:".");
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",e=>{
+  const f=e.target.closest("[data-filtro]"); if(f){filtro=f.dataset.filtro;renderFilters();renderTable();return;}
+  const a=e.target.closest("[data-act]"); if(!a) return;
+  const p=all.find(x=>x.id===a.dataset.id); if(!p) return;
+  if(!db) return;
+  if(a.dataset.act==="revisar"&&podeRevisar()) revisaoForm(p,false);
+  if(a.dataset.act==="comunicar") comunicarForm(p);
+  if(a.dataset.act==="editar") editarForm(p);
+  if(a.dataset.act==="desfazer") db.collection("processos").doc(p.id).update({status:"comunicar",comunicadoEm:null}).catch(()=>{});
+});
+$("#btn-novo").addEventListener("click",()=>{ if(db&&podeRevisar()) revisaoForm(null,true); });
+
+/* ---------- pessoas ---------- */
+async function renderPessoas(){
+  const box=$("#list-pessoas"); if(!box) return;
+  const outros=pessoas.filter(p=>p.id!==myId);
+  setCount("c-pessoas",outros.filter(p=>!p.papel).length,true);
+  if(!outros.length){ box.innerHTML=`<div class="empty">Ninguém além de você tem usuário ainda. Crie os usuários do Cristiano e da comunicação no Supabase (Authentication → Users → Add user).</div>`; return; }
+  box.innerHTML=outros.map(p=>{
+    const nome=p.nome||p.email||"Pessoa sem nome";
+    return `<div class="card" style="flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between">
+      <div style="min-width:0"><div style="font-weight:600">${esc(nome)}</div><div class="meta">${esc(p.email||"")}</div></div>
+      <select data-pessoa="${esc(p.id)}" aria-label="Acesso de ${esc(nome)}" style="max-width:320px">${PAPEIS.map(([k,l])=>`<option value="${k}" ${(p.papel||"")===k?"selected":""}>${l}</option>`).join("")}</select>
+    </div>`;}).join("");
+}
+document.addEventListener("change",async e=>{
+  const s=e.target.closest("select[data-pessoa]"); if(!s||!isOwner||!db) return;
+  const {error}=await sb.from("perfis").update({papel:s.value||null}).eq("id",s.dataset.pessoa);
+  if(error){ const b=$("#banner"); b.hidden=false; b.textContent="Não foi possível mudar o acesso: "+error.message; }
+});
+$("#busca").addEventListener("input",e=>{busca=e.target.value;renderTable();});
+
+$("#f-reg").addEventListener("submit",async e=>{
+  e.preventDefault(); const m=$("#reg-msg"); m.className="msg"; m.textContent="";
+  if(!db){m.className="msg err";m.textContent="Ainda conectando aos dados.";return;}
+  const proto=normProto($("#reg-proto").value), id=docId(proto), reg=$("#reg-regulador").value.trim().toUpperCase();
+  if(!id){m.className="msg err";m.textContent="Protocolo inválido.";return;}
+  const ex=all.find(x=>x.id===id);
+  try{
+    if(ex){
+      await db.collection("processos").doc(id).update({regulador:reg||ex.regulador,entrada:$("#reg-entrada").value||ex.entrada||null,regulacao:$("#reg-regulacao").value||ex.regulacao||null});
+      m.className="msg ok"; m.textContent=`Esse protocolo já existia (${STATUS[ex.status]}). Atualizei regulador e datas.`;
+    }else{
+      await db.collection("processos").doc(id).set({protocolo:proto,regulador:reg,entrada:$("#reg-entrada").value||null,regulacao:$("#reg-regulacao").value||null,status:"revisao",criadoEm:Date.now(),criadoPor:"registro"});
+      m.className="msg ok"; m.textContent=`${proto} registrado e enviado para revisão.`;
+    }
+    $("#reg-proto").value=""; $("#reg-proto").focus();
+  }catch(err){ m.className="msg err"; m.textContent=errText(err); }
+});
+
+/* ---------- data (Supabase) ---------- */
+const CFG=window.ESTEIRA_CONFIG||{};
+if(!window.supabase){ const b=$("#banner"); b.hidden=false; b.textContent="Não foi possível carregar a conexão com o banco. Verifique a internet e recarregue a página."; throw new Error("supabase-js não carregou"); }
+const sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
+const COLS={protocolo:"protocolo",regulador:"regulador",entrada:"entrada",regulacao:"regulacao",status:"status",porte:"porte",resultado:"resultado",
+  erro:"erro",erro2:"erro2",descricaoErro:"descricao_erro",reducao:"reducao",valorComunicar:"valor_comunicar",valorAprovado:"valor_aprovado",obs:"obs",
+  revisadoEm:"revisado_em",devolvidoEm:"devolvido_em",comunicadoEm:"comunicado_em",notaComunicacao:"nota_comunicacao",exportadoEm:"exportado_em",criadoEm:"criado_em",criadoPor:"criado_por"};
+const TS=new Set(["revisadoEm","devolvidoEm","comunicadoEm","exportadoEm","criadoEm"]);
+const NUM=new Set(["reducao","valorComunicar","valorAprovado"]);
+function toRow(o){const r={};for(const k in o){if(!COLS[k])continue;let v=o[k];if(TS.has(k))v=v==null?null:new Date(v).toISOString();if((k==="entrada"||k==="regulacao")&&!v)v=null;r[COLS[k]]=v===undefined?null:v;}return r;}
+function fromRow(r){const o={id:r.id};for(const k in COLS){let v=r[COLS[k]];if(TS.has(k))v=v?Date.parse(v):null;else if(NUM.has(k))v=v==null?null:Number(v);else if((k==="entrada"||k==="regulacao")&&v)v=String(v).slice(0,16);o[k]=v??null;}return o;}
+function mapErr(e){
+  if(!e) return {code:"erro"};
+  if(e.code==="42501"||/row-level security/i.test(e.message||"")) return {code:"sem_permissao"};
+  if(e.code==="23505") return {code:"duplicado"};
+  if(/fetch|network/i.test(e.message||"")) return {code:"rede"};
+  return {code:"erro",message:e.message};
+}
+async function salvar(q){const {data,error}=await q.select("id");if(error)throw mapErr(error);if(!data||!data.length)throw {code:"sem_permissao"};}
+// mesma interface usada pelo resto da página
+db={collection:()=>({doc:id=>({
+  set:body=>salvar(sb.from("processos").upsert({id,...toRow(body)})),
+  update:body=>salvar(sb.from("processos").update(toRow(body)).eq("id",id)),
+  delete:async()=>{const {error}=await sb.from("processos").delete().eq("id",id);if(error)throw mapErr(error);}
+})})};
+
+let recarga=null, canal=null;
+async function carregarProcessos(){
+  if(!role) return;
+  const {data,error}=await sb.from("processos").select("*").order("criado_em",{ascending:false}).limit(5000);
+  if(error){ $("#sync").textContent="Não foi possível carregar os processos."; return; }
+  all=data.map(fromRow); $("#sync").textContent="Atualizado em tempo real"; render();
+}
+async function carregarPessoas(){
+  if(role!=="gestor") return;
+  const {data}=await sb.from("perfis").select("id,email,nome,papel").order("criado_em");
+  pessoas=data||[]; renderPessoas();
+}
+async function carregarPerfil(){
+  const {data}=await sb.from("perfis").select("papel").eq("id",myId).maybeSingle();
+  const papel=(data&&data.papel)||null;
+  isOwner=papel==="gestor";
+  if(!papel){ aguardando("Seu acesso ainda não foi liberado","Avise a Lidi. Assim que ela liberar, sua parte aparece aqui."); $("#sync").textContent=""; }
+  setRole(papel);
+}
+function agendar(){ clearTimeout(recarga); recarga=setTimeout(()=>{carregarProcessos();carregarPessoas();},300); }
+async function iniciar(s){
+  session=s; myId=s.user.id;
+  $("#user-email").textContent=s.user.email||""; $("#userbox").hidden=false;
+  $("#sync").textContent="Carregando…";
+  await carregarPerfil(); await carregarProcessos(); await carregarPessoas();
+  if(canal) sb.removeChannel(canal);
+  canal=sb.channel("esteira")
+    .on("postgres_changes",{event:"*",schema:"public",table:"processos"},agendar)
+    .on("postgres_changes",{event:"*",schema:"public",table:"perfis"},async()=>{await carregarPerfil();agendar();})
+    .subscribe();
+}
+function encerrar(){
+  session=null; myId=null; role=null; isOwner=false; all=[]; pessoas=[];
+  if(canal){ sb.removeChannel(canal); canal=null; }
+  $("#userbox").hidden=true; $("#sync").textContent=""; closeSheet(); route(); render();
+}
+$("#f-login").addEventListener("submit",async e=>{
+  e.preventDefault(); const m=$("#lg-msg"); m.textContent=""; $("#lg-btn").disabled=true;
+  const {data,error}=await sb.auth.signInWithPassword({email:$("#lg-email").value.trim(),password:$("#lg-senha").value});
+  $("#lg-btn").disabled=false;
+  if(error){ m.textContent=/invalid/i.test(error.message)?"E-mail ou senha incorretos.":"Não foi possível entrar: "+error.message; return; }
+  $("#lg-senha").value=""; iniciar(data.session);
+});
+$("#btn-sair").addEventListener("click",async()=>{ await sb.auth.signOut(); encerrar(); });
+sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_OUT"&&session) encerrar(); });
+
+render();
+if(!CFG.supabaseUrl||!CFG.supabaseAnonKey){ const b=$("#banner"); b.hidden=false; b.textContent="Falta configurar o Supabase no arquivo config.js."; }
+sb.auth.getSession().then(({data})=>{ if(data.session) iniciar(data.session); else { $("#sync").textContent=""; route(); } });
+})();
+</script>
+</body>
+</html>
