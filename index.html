@@ -202,6 +202,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tl span{color:var(--muted);white-space:nowrap}
 div.card.click{cursor:pointer}
 
+input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4 4'/%3E%3C/svg%3E") no-repeat 12px 50%/18px;padding-left:38px;box-shadow:0 1px 2px rgba(20,22,58,.06)}
+#busca{background:var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4 4'/%3E%3C/svg%3E") no-repeat 12px 50%/18px;padding-left:38px}
+
 /* avisos */
 
 .toast{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40;width:min(440px,calc(100% - 24px));
@@ -268,6 +271,7 @@ div.card.click{cursor:pointer}
 
   <!-- REVISAO -->
   <section data-view="revisao" class="view" hidden>
+    <input id="busca-rev" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na revisão">
     <div class="panel">
       <div class="row" style="justify-content:space-between">
         <h2>Aguardando revisão <span class="count" id="c-rev2">0</span></h2>
@@ -285,6 +289,7 @@ div.card.click{cursor:pointer}
 
   <!-- COMUNICACAO -->
   <section data-view="comunicacao" class="view" hidden>
+    <input id="busca-com" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na comunicação">
     <div class="panel">
       <h2>A comunicar <span class="count" id="c-com2">0</span></h2>
       <p class="hint">Revisões concluídas pelo Cristiano, das mais antigas para as mais novas.</p>
@@ -422,8 +427,10 @@ function setRole(r){ role=r; route(); render(); }
 addEventListener("hashchange",route); route();
 
 /* ---------- render ---------- */
+let buscaRev="", buscaCom="";
+const casa=(p,q)=>!q||(p.protocolo+" "+(p.regulador||"")).toUpperCase().includes(q.trim().toUpperCase());
 function render(){
-  const by=s=>all.filter(p=>p.status===s);
+  const by=s=>all.filter(p=>p.status===s&&casa(p,(s==="revisao"||s==="devolvido")?buscaRev:buscaCom));
   const rev=by("revisao").sort((a,b)=>(a.regulacao||"").localeCompare(b.regulacao||"")||(a.criadoEm||0)-(b.criadoEm||0));
   const dev=by("devolvido").sort((a,b)=>(a.devolvidoEm||0)-(b.devolvidoEm||0));
   const com=by("comunicar").sort((a,b)=>(a.revisadoEm||0)-(b.revisadoEm||0));
@@ -431,14 +438,15 @@ function render(){
   const comd=by("comunicado").filter(p=>(p.comunicadoEm||0)>=weekAgo).sort((a,b)=>(b.comunicadoEm||0)-(a.comunicadoEm||0));
 
   setCount("c-registro",all.filter(faltaData).length,true);
-  setCount("c-revisao",rev.length+dev.length,true);
-  setCount("c-comunicacao",com.length,true);
+  setCount("c-revisao",all.filter(p=>p.status==="revisao"||p.status==="devolvido").length,true);
+  setCount("c-comunicacao",all.filter(p=>p.status==="comunicar").length,true);
   $("#c-rev2").textContent=rev.length; $("#c-dev").textContent=dev.length; $("#c-com2").textContent=com.length; $("#c-all").textContent=all.length;
 
-  $("#list-revisao").innerHTML=rev.length?rev.map(cardRevisao).join(""):`<div class="empty">Nenhum processo esperando revisão.</div>`;
-  $("#list-devolvido").innerHTML=dev.length?dev.map(cardRevisao).join(""):`<div class="empty">Nenhum processo devolvido.</div>`;
-  $("#list-comunicar").innerHTML=com.length?com.map(cardComunicar).join(""):`<div class="empty">Tudo comunicado. Novas revisões aparecem aqui sozinhas.</div>`;
-  $("#list-comunicado").innerHTML=comd.length?comd.map(cardComunicado).join(""):`<div class="empty">Nada comunicado nos últimos 7 dias.</div>`;
+  const nada=q=>`<div class="empty">Nenhum protocolo encontrado para “${esc(q.trim())}”.</div>`;
+  $("#list-revisao").innerHTML=rev.length?rev.map(cardRevisao).join(""):buscaRev.trim()?nada(buscaRev):`<div class="empty">Nenhum processo esperando revisão.</div>`;
+  $("#list-devolvido").innerHTML=dev.length?dev.map(cardRevisao).join(""):buscaRev.trim()?nada(buscaRev):`<div class="empty">Nenhum processo devolvido.</div>`;
+  $("#list-comunicar").innerHTML=com.length?com.map(cardComunicar).join(""):buscaCom.trim()?nada(buscaCom):`<div class="empty">Tudo comunicado. Novas revisões aparecem aqui sozinhas.</div>`;
+  $("#list-comunicado").innerHTML=comd.length?comd.map(cardComunicado).join(""):buscaCom.trim()?nada(buscaCom):`<div class="empty">Nada comunicado nos últimos 7 dias.</div>`;
   renderFilters(); renderTable(); renderExport();
 }
 function setCount(id,n,hot){const el=$("#"+id); el.textContent=n; el.classList.toggle("hot",hot&&n>0);}
@@ -753,6 +761,8 @@ document.addEventListener("change",async e=>{
   carregarPessoas();
 });
 $("#busca").addEventListener("input",e=>{busca=e.target.value;renderTable();});
+$("#busca-rev").addEventListener("input",e=>{buscaRev=e.target.value;render();});
+$("#busca-com").addEventListener("input",e=>{buscaCom=e.target.value;render();});
 
 /* ---------- datas no formato da planilha (dd/mm/aaaa hh:mm) ---------- */
 const RE_DATA=/^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?)?\s*$/;
