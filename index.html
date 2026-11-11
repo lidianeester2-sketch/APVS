@@ -171,13 +171,31 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .stat .l{font-size:13px;color:var(--muted)}
 .check{display:flex;gap:10px;align-items:center;font-size:16px;min-height:44px}
 .check input{accent-color:var(--accent);width:20px;height:20px}
+/* avisos */
+.iconbtn{display:inline-flex;align-items:center;gap:5px}
+.iconbtn svg{width:20px;height:20px}
+.iconbtn[aria-pressed="true"]{color:var(--coral-ink)}
+.iconbtn[aria-pressed="true"] .off{display:none}
+.toast{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40;width:min(440px,calc(100% - 24px));
+  background:rgba(255,255,255,.94);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:16px;box-shadow:0 10px 40px rgba(20,22,58,.22);
+  padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;animation:drop .35s cubic-bezier(.2,.9,.3,1)}
+.toast img{width:34px;height:34px;border-radius:8px;flex-shrink:0}
+.toast b{display:block;font-size:15px}
+.toast span{font-size:14px;color:var(--muted)}
+@keyframes drop{from{transform:translate(-50%,-30px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+@media (max-width:420px){.topbar .who{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="topbar" id="userbox" hidden><span class="who" id="user-email"></span><button class="ghost" id="btn-sair" type="button">Sair</button></div>
+    <div class="topbar" id="userbox" hidden>
+      <span class="who" id="user-email"></span>
+      <button class="ghost iconbtn" id="btn-avisos" type="button" aria-pressed="false" title="Avisos de processos novos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 4.5 1.8 6 1.8 6H4.2S6 14 6 9.5z"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/><path class="off" d="M3.5 3.5l17 17"/></svg><span id="avisos-txt">Avisos</span></button>
+      <button class="ghost" id="btn-senha" type="button">Senha</button>
+      <button class="ghost" id="btn-sair" type="button">Sair</button>
+    </div>
     <h1>Processos APVS</h1>
     <div class="sub"><img src="gs-simbolo.png" alt="">Gestão Segura</div>
   </header>
@@ -303,6 +321,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 </div>
 
 <datalist id="regs"><option value="EMERSON"><option value="TIAGO"><option value="SAYMOM"><option value="MODESTO"><option value="TAVARES"><option value="VICTOR"><option value="ALESTHER"></datalist>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <div class="overlay" id="ov" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ov-title" id="sheet"></div>
@@ -643,6 +663,7 @@ document.addEventListener("change",async e=>{
   const s=e.target.closest("select[data-pessoa]"); if(!s||!isOwner||!db) return;
   const {error}=await sb.from("perfis").update({papel:s.value||null}).eq("id",s.dataset.pessoa);
   if(error){ const b=$("#banner"); b.hidden=false; b.textContent="Não foi possível mudar o acesso: "+error.message; }
+  carregarPessoas();
 });
 $("#busca").addEventListener("input",e=>{busca=e.target.value;renderTable();});
 
@@ -677,25 +698,115 @@ function toRow(o){const r={};for(const k in o){if(!COLS[k])continue;let v=o[k];i
 function fromRow(r){const o={id:r.id};for(const k in COLS){let v=r[COLS[k]];if(TS.has(k))v=v?Date.parse(v):null;else if(NUM.has(k))v=v==null?null:Number(v);else if((k==="entrada"||k==="regulacao")&&v)v=String(v).slice(0,16);o[k]=v??null;}return o;}
 function mapErr(e){
   if(!e) return {code:"erro"};
-  if(e.code==="42501"||/row-level security/i.test(e.message||"")) return {code:"sem_permissao"};
+  console.error("Supabase:",e);
+  if(/row-level security/i.test(e.message||"")) return {code:"sem_permissao"};
+  if(e.code==="42501") return {code:"erro",message:"o banco recusou o acesso à tabela ("+e.message+")"};
   if(e.code==="23505") return {code:"duplicado"};
   if(/fetch|network/i.test(e.message||"")) return {code:"rede"};
   return {code:"erro",message:e.message};
 }
-async function salvar(q){const {data,error}=await q.select("id");if(error)throw mapErr(error);if(!data||!data.length)throw {code:"sem_permissao"};}
+async function salvar(q){const {data,error}=await q.select("id");if(error)throw mapErr(error);if(!data||!data.length)throw {code:"sem_permissao"};await carregarProcessos();}
 // mesma interface usada pelo resto da página
 db={collection:()=>({doc:id=>({
   set:body=>salvar(sb.from("processos").upsert({id,...toRow(body)})),
   update:body=>salvar(sb.from("processos").update(toRow(body)).eq("id",id)),
-  delete:async()=>{const {error}=await sb.from("processos").delete().eq("id",id);if(error)throw mapErr(error);}
+  delete:async()=>{const {error}=await sb.from("processos").delete().eq("id",id);if(error)throw mapErr(error);await carregarProcessos();}
 })})};
 
-let recarga=null, canal=null;
+let recarga=null, canal=null, filaAnterior=null;
+const TITULO="Processos APVS";
+
+/* ---------- avisos (som + notificação) ---------- */
+let audio=null;
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const avisosLigados=()=>lsGet("avisos")==="1";
+function prepararSom(){ try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); if(audio.state==="suspended") audio.resume(); }catch(e){} }
+document.addEventListener("pointerdown",()=>{ if(avisosLigados()) prepararSom(); },{passive:true});
+function tocarAlarme(){
+  if(!audio) return;
+  const t0=audio.currentTime+0.02;
+  // três toques curtos, repetidos duas vezes
+  [0,0.9].forEach(rep=>[[880,0],[1175,0.16],[1568,0.32]].forEach(([f,dt])=>{
+    const o=audio.createOscillator(), g=audio.createGain();
+    o.type="sine"; o.frequency.value=f;
+    const t=t0+rep+dt; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.28,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+0.45);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t+0.5);
+  }));
+}
+function atualizarBotaoAvisos(){
+  const on=avisosLigados(); $("#btn-avisos").setAttribute("aria-pressed",on); $("#avisos-txt").textContent=on?"Avisos ligados":"Avisos";
+}
+$("#btn-avisos").addEventListener("click",async()=>{
+  if(avisosLigados()){ lsSet("avisos","0"); atualizarBotaoAvisos(); mostrarToast("Avisos desligados","Você não vai mais ouvir o alarme.",null); return; }
+  lsSet("avisos","1"); prepararSom(); atualizarBotaoAvisos();
+  if("Notification" in window && Notification.permission==="default"){ try{ await Notification.requestPermission(); }catch(e){} }
+  tocarAlarme();
+  mostrarToast("Avisos ligados","Quando chegar processo novo, você ouve o alarme e recebe um aviso.",null);
+});
+let toastTimer=null;
+function mostrarToast(titulo,texto,aba){
+  const t=$("#toast"); t.innerHTML=`<img src="apple-touch-icon.png" alt=""><div><b>${esc(titulo)}</b><span>${esc(texto)}</span></div>`;
+  t.hidden=false; t.onclick=()=>{ t.hidden=true; if(aba) location.hash=aba; };
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.hidden=true;},7000);
+}
+// o que conta como "coisa nova" para cada pessoa
+function fila(){
+  if(role==="revisao") return all.filter(p=>p.status==="revisao"||p.status==="devolvido");
+  if(role==="comunicacao") return all.filter(p=>p.status==="comunicar");
+  if(role==="gestor") return all.filter(p=>p.status==="comunicar"||(p.criadoPor==="revisao"&&faltaData(p)));
+  return [];
+}
+const ABA_AVISO={revisao:"revisao",comunicacao:"comunicacao",gestor:"comunicacao"};
+function verificarNovos(){
+  const atual=fila(), ids=new Set(atual.map(p=>p.id+"|"+p.status));
+  document.title=atual.length?`(${atual.length}) ${TITULO}`:TITULO;
+  try{ if(navigator.setAppBadge){ atual.length?navigator.setAppBadge(atual.length):navigator.clearAppBadge(); } }catch(e){}
+  if(filaAnterior){
+    const novos=atual.filter(p=>!filaAnterior.has(p.id+"|"+p.status));
+    if(novos.length){
+      const titulo=novos.length===1?"Processo novo":`${novos.length} processos novos`;
+      const texto=novos.length===1?`${novos[0].protocolo} · ${STATUS[novos[0].status]}`:novos.slice(0,3).map(p=>p.protocolo).join(", ")+(novos.length>3?"…":"");
+      mostrarToast(titulo,texto,ABA_AVISO[role]);
+      if(avisosLigados()){
+        tocarAlarme();
+        if("Notification" in window && Notification.permission==="granted"){
+          try{ const n=new Notification(titulo,{body:texto,icon:"apple-touch-icon.png",tag:"apvs",renotify:true}); n.onclick=()=>{window.focus();location.hash=ABA_AVISO[role];n.close();}; }catch(e){}
+        }
+      }
+    }
+  }
+  filaAnterior=ids;
+}
+
+/* ---------- trocar senha ---------- */
+function senhaForm(primeira){
+  openSheet(`<h3 id="ov-title">${primeira?"Crie a sua senha":"Trocar senha"}</h3>
+    ${primeira?'<p class="hint">Você entrou com a senha que a Lidi passou. Escolha uma senha só sua.</p>':""}
+    <label class="f">Nova senha<input id="sn-1" type="password" autocomplete="new-password" minlength="6"></label>
+    <label class="f">Repita a nova senha<input id="sn-2" type="password" autocomplete="new-password" minlength="6"></label>
+    <p class="hint">Mínimo de 6 caracteres.</p>
+    <div class="msg err" id="sn-msg"></div>
+    <div class="row end"><button class="ghost" id="sn-cancel">${primeira?"Agora não":"Cancelar"}</button><button class="primary" id="sn-ok">Salvar senha</button></div>`);
+  $("#sn-cancel").onclick=closeSheet;
+  $("#sn-ok").onclick=async()=>{
+    const a=$("#sn-1").value, b=$("#sn-2").value, m=$("#sn-msg"); m.textContent="";
+    if(a.length<6){ m.textContent="A senha precisa ter pelo menos 6 caracteres."; return; }
+    if(a!==b){ m.textContent="As duas senhas estão diferentes."; return; }
+    if(a==="Gestao123"){ m.textContent="Escolha uma senha diferente da que a Lidi passou."; return; }
+    $("#sn-ok").disabled=true;
+    const {error}=await sb.auth.updateUser({password:a,data:{senha_trocada:true}});
+    $("#sn-ok").disabled=false;
+    if(error){ m.textContent=/different|same/i.test(error.message)?"A nova senha precisa ser diferente da atual.":/weak|short|length/i.test(error.message)?"Senha fraca. Use pelo menos 6 caracteres.":"Não foi possível trocar: "+error.message; return; }
+    closeSheet(); mostrarToast("Senha alterada","Use a nova senha no próximo acesso.",null);
+  };
+}
+$("#btn-senha").addEventListener("click",()=>{ if(session) senhaForm(false); });
 async function carregarProcessos(){
   if(!role) return;
   const {data,error}=await sb.from("processos").select("*").order("criado_em",{ascending:false}).limit(5000);
-  if(error){ $("#sync").textContent="Não foi possível carregar os processos."; return; }
-  all=data.map(fromRow); $("#sync").textContent="Atualizado em tempo real"; render();
+  if(error){ console.error("Supabase:",error); $("#sync").textContent="Não foi possível carregar os processos: "+error.message; return; }
+  all=data.map(fromRow); $("#sync").textContent="Atualizado em tempo real"; render(); verificarNovos();
 }
 async function carregarPessoas(){
   if(role!=="gestor") return;
@@ -712,7 +823,7 @@ async function carregarPerfil(){
 function agendar(){ clearTimeout(recarga); recarga=setTimeout(()=>{carregarProcessos();carregarPessoas();},300); }
 async function iniciar(s){
   session=s; myId=s.user.id;
-  $("#user-email").textContent=s.user.email||""; $("#userbox").hidden=false;
+  $("#user-email").textContent=s.user.email||""; $("#userbox").hidden=false; atualizarBotaoAvisos(); filaAnterior=null;
   $("#sync").textContent="Carregando…";
   await carregarPerfil(); await carregarProcessos(); await carregarPessoas();
   if(canal) sb.removeChannel(canal);
@@ -720,9 +831,12 @@ async function iniciar(s){
     .on("postgres_changes",{event:"*",schema:"public",table:"processos"},agendar)
     .on("postgres_changes",{event:"*",schema:"public",table:"perfis"},async()=>{await carregarPerfil();agendar();})
     .subscribe();
+  if(!(s.user.user_metadata&&s.user.user_metadata.senha_trocada)) senhaForm(true);
 }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&session) agendar(); });
+setInterval(()=>{ if(session) carregarProcessos(); },30000);
 function encerrar(){
-  session=null; myId=null; role=null; isOwner=false; all=[]; pessoas=[];
+  session=null; myId=null; role=null; isOwner=false; all=[]; pessoas=[]; filaAnterior=null; document.title=TITULO;
   if(canal){ sb.removeChannel(canal); canal=null; }
   $("#userbox").hidden=true; $("#sync").textContent=""; closeSheet(); route(); render();
 }
