@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="planilha.js"></script>
+<script src="prazo.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <style>
@@ -35,7 +36,7 @@
 [hidden]{display:none!important}
 html{background:var(--bg)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.38;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
-.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:max(14px,env(safe-area-inset-top,0px));padding-bottom:calc(32px + var(--tabbar) + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:max(14px,env(safe-area-inset-top,0px));padding-bottom:calc(32px + var(--tabbar) + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 
 /* header */
 header.top{display:flex;flex-direction:column;gap:2px;padding-top:8px}
@@ -205,6 +206,36 @@ div.card.click{cursor:pointer}
 input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4 4'/%3E%3C/svg%3E") no-repeat 12px 50%/18px;padding-left:38px;box-shadow:0 1px 2px rgba(20,22,58,.06)}
 #busca{background:var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4 4'/%3E%3C/svg%3E") no-repeat 12px 50%/18px;padding-left:38px}
 
+/* quadro estilo Trello */
+.board-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.board-top .busca{flex:1 1 260px;width:auto}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;align-items:start}
+.col{background:#E7E8F1;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;scroll-snap-align:start;min-width:0}
+.col-head{display:flex;align-items:center;gap:8px;padding:2px 4px}
+.col-head h2{font-size:16px;font-weight:700;margin:0;color:var(--navy)}
+.col-head .count{background:rgba(255,255,255,.75);color:var(--navy)}
+.col .hint{padding:0 4px;font-size:13px}
+.col .cards{grid-template-columns:1fr;gap:8px}
+.col .card{border:1px solid transparent;box-shadow:0 1px 2px rgba(20,22,58,.14);padding:12px;gap:8px}
+.col .card.click:hover{border-color:var(--coral)}
+.col .card .obs{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;padding:8px 10px}
+.col .card .money{font-size:19px}
+.col .card .res{font-size:16px}
+.col .empty{background:rgba(255,255,255,.55)}
+.ver-mais{background:rgba(255,255,255,.7);color:var(--navy);font-size:14px;min-height:40px}
+@media (max-width:760px){
+  .board{grid-auto-columns:88%;margin:0 calc(-1 * max(16px,env(safe-area-inset-right,0px))) 0 0;padding-right:16px}
+}
+
+/* prazo */
+.card.prazo-atrasado{border:1.5px solid var(--red-bright);box-shadow:0 0 0 3px rgba(255,59,48,.1)}
+.card.prazo-hoje{border:1.5px solid #FF9500;box-shadow:0 0 0 3px rgba(255,149,0,.12)}
+.alerta-atraso{display:flex;align-items:center;gap:8px;background:var(--red-bright);color:#fff;font-weight:600;font-size:14px;border-radius:9px;padding:8px 11px}
+.chip.s-hoje{background:#FF9500;color:#fff}
+.prazo-txt{font-size:13px;color:var(--muted);font-weight:500}
+.prazo-txt.atrasado{color:var(--red);font-weight:600}
+.prazo-txt.hoje{color:var(--orange);font-weight:600}
+
 /* avisos */
 
 .toast{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40;width:min(440px,calc(100% - 24px));
@@ -271,33 +302,38 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
 
   <!-- REVISAO -->
   <section data-view="revisao" class="view" hidden>
-    <input id="busca-rev" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na revisão">
-    <div class="panel">
-      <div class="row" style="justify-content:space-between">
-        <h2>Aguardando revisão <span class="count" id="c-rev2">0</span></h2>
-        <button class="primary" id="btn-novo">+ Novo protocolo</button>
-      </div>
-      <p class="hint">Toque no processo para ver os detalhes e revisar. Se o protocolo não estiver na lista, use “Novo protocolo”.</p>
-      <div class="cards" id="list-revisao"></div>
+    <div class="board-top">
+      <input id="busca-rev" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na revisão">
+      <button class="primary" id="btn-novo">+ Novo protocolo</button>
     </div>
-    <div class="panel">
-      <h2>Devolvidos ao regulador <span class="count" id="c-dev">0</span></h2>
-      <p class="hint">Quando o processo voltar ajustado, toque nele para concluir a revisão.</p>
-      <div class="cards" id="list-devolvido"></div>
+    <div class="board">
+      <div class="col">
+        <div class="col-head"><h2>Aguardando revisão</h2><span class="count" id="c-rev2">0</span></div>
+        <p class="hint">Atrasados e os que vencem hoje ficam no topo.</p>
+        <div class="cards" id="list-revisao"></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><h2>Devolvidos ao regulador</h2><span class="count" id="c-dev">0</span></div>
+        <p class="hint">Quando voltar ajustado, toque para concluir a revisão.</p>
+        <div class="cards" id="list-devolvido"></div>
+      </div>
     </div>
   </section>
-
-  <!-- COMUNICACAO -->
   <section data-view="comunicacao" class="view" hidden>
-    <input id="busca-com" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na comunicação">
-    <div class="panel">
-      <h2>A comunicar <span class="count" id="c-com2">0</span></h2>
-      <p class="hint">Revisões concluídas pelo Cristiano, das mais antigas para as mais novas.</p>
-      <div class="cards" id="list-comunicar"></div>
+    <div class="board-top">
+      <input id="busca-com" class="busca" type="search" placeholder="Buscar protocolo ou regulador" aria-label="Buscar na comunicação">
     </div>
-    <div class="panel">
-      <h2>Comunicados nos últimos 7 dias</h2>
-      <div class="cards" id="list-comunicado"></div>
+    <div class="board">
+      <div class="col">
+        <div class="col-head"><h2>A comunicar</h2><span class="count" id="c-com2">0</span></div>
+        <p class="hint">Atrasados e os que vencem hoje ficam no topo.</p>
+        <div class="cards" id="list-comunicar"></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><h2>Comunicados (7 dias)</h2><span class="count" id="c-comd">0</span></div>
+        <p class="hint">Os mais recentes primeiro. Aparecem só os 5 últimos; a busca procura em todos.</p>
+        <div class="cards" id="list-comunicado"></div>
+      </div>
     </div>
   </section>
 
@@ -428,32 +464,58 @@ addEventListener("hashchange",route); route();
 
 /* ---------- render ---------- */
 let buscaRev="", buscaCom="";
+let verTodosComd=false; try{ verTodosComd=localStorage.getItem("verTodosComd")==="1"; }catch(e){}
+document.addEventListener("click",e=>{ if(e.target.closest("#btn-ver-comd")){ verTodosComd=!verTodosComd; try{localStorage.setItem("verTodosComd",verTodosComd?"1":"0");}catch(err){} render(); } });
 const casa=(p,q)=>!q||(p.protocolo+" "+(p.regulador||"")).toUpperCase().includes(q.trim().toUpperCase());
 function render(){
   const by=s=>all.filter(p=>p.status===s&&casa(p,(s==="revisao"||s==="devolvido")?buscaRev:buscaCom));
-  const rev=by("revisao").sort((a,b)=>(a.regulacao||"").localeCompare(b.regulacao||"")||(a.criadoEm||0)-(b.criadoEm||0));
-  const dev=by("devolvido").sort((a,b)=>(a.devolvidoEm||0)-(b.devolvidoEm||0));
-  const com=by("comunicar").sort((a,b)=>(a.revisadoEm||0)-(b.revisadoEm||0));
+  const agora=new Date();
+  const porPrazo=(desempate)=>(a,b)=>PrazoAPVS.comparar(a,b,agora)||desempate(a,b);
+  const rev=by("revisao").sort(porPrazo((a,b)=>(a.regulacao||"").localeCompare(b.regulacao||"")||(a.criadoEm||0)-(b.criadoEm||0)));
+  const dev=by("devolvido").sort(porPrazo((a,b)=>(a.devolvidoEm||0)-(b.devolvidoEm||0)));
+  const com=by("comunicar").sort(porPrazo((a,b)=>(a.revisadoEm||0)-(b.revisadoEm||0)));
   const weekAgo=Date.now()-7*864e5;
   const comd=by("comunicado").filter(p=>(p.comunicadoEm||0)>=weekAgo).sort((a,b)=>(b.comunicadoEm||0)-(a.comunicadoEm||0));
 
   setCount("c-registro",all.filter(faltaData).length,true);
   setCount("c-revisao",all.filter(p=>p.status==="revisao"||p.status==="devolvido").length,true);
   setCount("c-comunicacao",all.filter(p=>p.status==="comunicar").length,true);
-  $("#c-rev2").textContent=rev.length; $("#c-dev").textContent=dev.length; $("#c-com2").textContent=com.length; $("#c-all").textContent=all.length;
+  $("#c-rev2").textContent=rev.length; $("#c-dev").textContent=dev.length; $("#c-com2").textContent=com.length; $("#c-comd").textContent=comd.length; $("#c-all").textContent=all.length;
 
   const nada=q=>`<div class="empty">Nenhum protocolo encontrado para “${esc(q.trim())}”.</div>`;
   $("#list-revisao").innerHTML=rev.length?rev.map(cardRevisao).join(""):buscaRev.trim()?nada(buscaRev):`<div class="empty">Nenhum processo esperando revisão.</div>`;
   $("#list-devolvido").innerHTML=dev.length?dev.map(cardRevisao).join(""):buscaRev.trim()?nada(buscaRev):`<div class="empty">Nenhum processo devolvido.</div>`;
   $("#list-comunicar").innerHTML=com.length?com.map(cardComunicar).join(""):buscaCom.trim()?nada(buscaCom):`<div class="empty">Tudo comunicado. Novas revisões aparecem aqui sozinhas.</div>`;
-  $("#list-comunicado").innerHTML=comd.length?comd.map(cardComunicado).join(""):buscaCom.trim()?nada(buscaCom):`<div class="empty">Nada comunicado nos últimos 7 dias.</div>`;
+  const LIM=5, mostrar=verTodosComd||buscaCom.trim()?comd:comd.slice(0,LIM);
+  $("#list-comunicado").innerHTML=comd.length
+    ?mostrar.map(cardComunicado).join("")+(comd.length>LIM&&!buscaCom.trim()?`<button type="button" class="ver-mais" id="btn-ver-comd">${verTodosComd?"Mostrar só os 5 mais recentes":`Ver todos (${comd.length})`}</button>`:"")
+    :buscaCom.trim()?nada(buscaCom):`<div class="empty">Nada comunicado nos últimos 7 dias.</div>`;
   renderFilters(); renderTable(); renderExport();
 }
 function setCount(id,n,hot){const el=$("#"+id); el.textContent=n; el.classList.toggle("hot",hot&&n>0);}
 
+const ICON_ALERTA='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>';
+const fmtVence=d=>d.toLocaleString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).replace(",","");
+function prazoClasse(p){ const s=PrazoAPVS.situacao(p); return s&&s.nivel!=="ok"?" prazo-"+s.nivel:""; }
+function prazoTopo(p){
+  const s=PrazoAPVS.situacao(p);
+  return s&&s.nivel==="atrasado"?`<div class="alerta-atraso">${ICON_ALERTA}Prioridade, processo ultrapassou o prazo</div>`:"";
+}
+function prazoChip(p,padrao){
+  const s=PrazoAPVS.situacao(p);
+  return s&&s.nivel==="hoje"?'<span class="chip s-hoje">Vence hoje!</span>':padrao;
+}
+function prazoMeta(p){
+  const s=PrazoAPVS.situacao(p);
+  if(!s) return p.entrada||p.status==="comunicado"?"":'<span class="prazo-txt">Sem data de entrada, sem prazo</span>';
+  const t=s.nivel==="atrasado"?"Venceu":"Vence";
+  return `<span class="prazo-txt ${s.nivel}">${t} ${fmtVence(s.vence)}</span>`;
+}
 function cardRevisao(p){
-  return `<button class="card click" data-act="detalhe" data-id="${esc(p.id)}">
-    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
+  return `<button class="card click${prazoClasse(p)}" data-act="detalhe" data-id="${esc(p.id)}">
+    ${prazoTopo(p)}
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${prazoChip(p,statusChip(p.status))}</div>
+    ${prazoMeta(p)}
     <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}${p.porte?`<span>Porte <b>${esc(p.porte)}</b></span>`:""}</div>
     ${(p.status==="devolvido"||/^Voltou da gestão/.test(p.obs||""))&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
   </button>`;
@@ -467,8 +529,10 @@ function valorDestaque(p){
   return parts.length?`<div class="row" style="gap:20px">${parts.join("")}</div>`:"";
 }
 function cardComunicar(p){
-  return `<div class="card click" data-act="detalhe" data-id="${esc(p.id)}">
-    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span><span class="chip s-comunicar">${esc(p.porte||"")}</span></div>
+  return `<div class="card click${prazoClasse(p)}" data-act="detalhe" data-id="${esc(p.id)}">
+    ${prazoTopo(p)}
+    <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${prazoChip(p,p.porte?`<span class="chip s-comunicar">${esc(p.porte)}</span>`:"")}</div>
+    ${prazoMeta(p)}
     <div class="res">${esc((RES[p.resultado]||{}).l||"—")}</div>
     ${valorDestaque(p)}
     ${p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
@@ -499,7 +563,8 @@ function renderTable(){
   box.classList.toggle("list",rows.length>0);
   box.innerHTML=rows.length?rows.slice(0,400).map(p=>{
     const sub=[p.regulador||"", (RES[p.resultado]||{}).l||"", p.erro&&p.erro!==SEM_ERRO?p.erro:""].filter(Boolean).join(" · ");
-    const side=faltaData(p)?'<span class="miss">Faltam datas</span>':(p.reducao!=null?brl(p.reducao):(p.regulacao?fmtLocal(p.regulacao):""));
+    const sp=PrazoAPVS.situacao(p);
+    const side=sp&&sp.nivel==="atrasado"?'<span class="prazo-txt atrasado">Atrasado</span>':sp&&sp.nivel==="hoje"?'<span class="prazo-txt hoje">Vence hoje!</span>':faltaData(p)?'<span class="miss">Faltam datas</span>':(p.reducao!=null?brl(p.reducao):(p.regulacao?fmtLocal(p.regulacao):""));
     return `<button class="lrow" data-act="detalhe" data-id="${esc(p.id)}">
       <div class="lmain"><span class="proto">${esc(p.protocolo)}</span><span class="lsub">${esc(sub)||"&nbsp;"}</span></div>
       <div class="lside">${statusChip(p.status)}<span>${side}</span></div>${CHEV}</button>`;}).join("")
@@ -643,12 +708,16 @@ function detalheForm(p){
       <button class="ghost" id="dt-copy" style="padding:2px 0;min-height:0;font-size:14px">Copiar protocolo</button></div>
       ${statusChip(p.status)}
     </div>
+    ${prazoTopo(p)}
     ${r.l?`<div><div class="res">${esc(r.l)}</div>${valorDestaque(p)}</div>`:""}
     ${grupo("Processo",[
       linha("Regulador",esc(p.regulador||"")),
       linha("Porte",esc(p.porte||"")),
       linha("Entrada",p.entrada?fmtLocal(p.entrada):'<span class="miss">Falta</span>'),
       linha("Liberação do regulador",p.regulacao?fmtLocal(p.regulacao):'<span class="miss">Falta</span>'),
+      (()=>{ const sp=PrazoAPVS.situacao(p); if(!sp) return "";
+        const txt=fmtVence(sp.vence)+(sp.nivel==="atrasado"?" · atrasado":sp.nivel==="hoje"?" · vence hoje":"");
+        return linha("Prazo (3 dias úteis)",txt,"prazo-txt "+sp.nivel); })(),
     ])}
     ${grupo("Revisão",[
       linha("Erro do regulador",esc(p.erro||"")),
@@ -1087,6 +1156,7 @@ async function iniciar(s){
 }
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&session) agendar(); });
 setInterval(()=>{ if(session) carregarProcessos(); },30000);
+setInterval(()=>{ if(session&&role) render(); },60000);
 function encerrar(){
   session=null; myId=null; role=null; isOwner=false; all=[]; pessoas=[]; filaAnterior=null; document.title=TITULO;
   if(canal){ sb.removeChannel(canal); canal=null; }
