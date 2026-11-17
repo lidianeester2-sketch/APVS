@@ -98,7 +98,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:50
 input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--fill);border:0;border-radius:10px;padding:11px 12px;width:100%;min-height:44px;-webkit-appearance:none;appearance:none}
 select{background-image:linear-gradient(45deg,transparent 50%,#8E8E93 50%),linear-gradient(135deg,#8E8E93 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
 input::placeholder,textarea::placeholder{color:var(--faint)}
-input[type="checkbox"]{width:auto;min-height:0}
+input[type="checkbox"]{width:22px;height:22px;min-height:0;padding:0;-webkit-appearance:checkbox;appearance:auto;accent-color:var(--navy);flex-shrink:0}
 textarea{min-height:76px;resize:vertical}
 input.mono{font-family:var(--f-mono);font-size:15px}
 button{font:inherit;font-size:16px;font-weight:600;border-radius:12px;border:0;background:var(--fill);color:var(--accent);padding:11px 16px;min-height:44px;cursor:pointer}
@@ -455,7 +455,7 @@ function cardRevisao(p){
   return `<button class="card click" data-act="detalhe" data-id="${esc(p.id)}">
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${statusChip(p.status)}</div>
     <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}${p.porte?`<span>Porte <b>${esc(p.porte)}</b></span>`:""}</div>
-    ${p.status==="devolvido"&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
+    ${(p.status==="devolvido"||/^Voltou da gestão/.test(p.obs||""))&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
   </button>`;
 }
 function valorDestaque(p){
@@ -666,12 +666,18 @@ function detalheForm(p){
       ${podeRev?'<button class="primary" id="dt-rev">Revisar</button>':""}
       ${podeComunicar?'<button class="primary" id="dt-com">Marcar como comunicado</button>':""}
     </div>
+    ${role==="gestor"&&(p.status==="comunicar"||p.status==="comunicado")?`<div class="dl">
+      <button class="dl-row" id="dt-volta-rev"><span style="color:var(--ink)">Voltar para revisão</span>${CHEV}</button>
+      ${p.status==="comunicado"?`<button class="dl-row" id="dt-volta-com"><span style="color:var(--ink)">Voltar para comunicação</span>${CHEV}</button>`:""}
+    </div>`:""}
     ${role==="gestor"?'<div class="dl"><button class="dl-row danger" id="dt-del" style="justify-content:center">Excluir protocolo</button></div>':""}`);
   $("#dt-close").onclick=closeSheet;
   $("#dt-copy").onclick=async()=>{ try{ await navigator.clipboard.writeText(p.protocolo); $("#dt-copy").textContent="Copiado"; }catch(e){ $("#dt-copy").textContent=p.protocolo; } };
   if($("#dt-edit")) $("#dt-edit").onclick=()=>editarForm(p);
   if($("#dt-rev")) $("#dt-rev").onclick=()=>revisaoForm(p,false);
   if($("#dt-com")) $("#dt-com").onclick=()=>comunicarForm(p);
+  if($("#dt-volta-rev")) $("#dt-volta-rev").onclick=()=>voltarForm(p,"revisao");
+  if($("#dt-volta-com")) $("#dt-volta-com").onclick=()=>voltarForm(p,"comunicar");
   if($("#dt-del")){
     let armado=false;
     $("#dt-del").onclick=async()=>{
@@ -682,6 +688,28 @@ function detalheForm(p){
       catch(e){ b.disabled=false; $("#dt-msg").textContent=errText(e); }
     };
   }
+}
+
+function voltarForm(p,destino){
+  const rev=destino==="revisao";
+  openSheet(`<h3 id="ov-title">${rev?"Voltar para revisão":"Voltar para comunicação"}</h3>
+    <div><div class="proto">${esc(p.protocolo)}</div><div class="meta"><span>Agora: <b>${STATUS[p.status]}</b></span></div></div>
+    <p class="hint">${rev
+      ?"O processo volta para a fila do Cristiano, com a revisão anterior já preenchida para ele corrigir. Sai da comunicação e da contagem de revisões da planilha até ser revisado de novo."
+      :"O processo volta para a fila da comunicação como “A comunicar”. A revisão continua a mesma."}</p>
+    <label class="f">Motivo (opcional)<textarea id="vt-motivo" placeholder="${rev?"Ex.: valor da redução errado":"Ex.: APVS não recebeu a comunicação"}"></textarea></label>
+    <div class="msg err" id="vt-msg"></div>
+    <div class="row end"><button class="ghost" id="vt-cancel">Cancelar</button><button class="primary" id="vt-ok">${rev?"Voltar para revisão":"Voltar para comunicação"}</button></div>`);
+  $("#vt-cancel").onclick=closeSheet;
+  $("#vt-ok").onclick=async()=>{
+    const motivo=$("#vt-motivo").value.trim(), b=$("#vt-ok"); b.disabled=true;
+    const corpo=rev
+      ?{status:"revisao",revisadoEm:null,comunicadoEm:null,notaComunicacao:null,exportadoEm:null,
+        obs:"Voltou da gestão"+(motivo?": "+motivo:"")+(p.obs&&!/^Voltou da gestão/.test(p.obs)?"\n— Obs. anterior: "+p.obs:"")}
+      :{status:"comunicar",comunicadoEm:null,notaComunicacao:motivo?"Voltou da gestão: "+motivo:null};
+    try{ await db.collection("processos").doc(p.id).update(corpo); closeSheet(); mostrarToast(rev?"Voltou para revisão":"Voltou para comunicação",p.protocolo,rev?"revisao":"comunicacao"); }
+    catch(e){ b.disabled=false; $("#vt-msg").textContent=errText(e); }
+  };
 }
 
 function comunicarForm(p){
@@ -751,7 +779,10 @@ async function renderPessoas(){
     const nome=p.nome||p.email||"Pessoa sem nome";
     return `<div class="card" style="flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between">
       <div style="min-width:0"><div style="font-weight:600">${esc(nome)}</div><div class="meta">${esc(p.email||"")}</div></div>
-      <select data-pessoa="${esc(p.id)}" aria-label="Acesso de ${esc(nome)}" style="max-width:320px">${PAPEIS.map(([k,l])=>`<option value="${k}" ${(p.papel||"")===k?"selected":""}>${l}</option>`).join("")}</select>
+      <div class="row" style="flex:1 1 260px;justify-content:flex-end;max-width:440px">
+        <select data-pessoa="${esc(p.id)}" aria-label="Acesso de ${esc(nome)}" style="flex:1 1 200px">${PAPEIS.map(([k,l])=>`<option value="${k}" ${(p.papel||"")===k?"selected":""}>${l}</option>`).join("")}</select>
+        <button type="button" data-senha="${esc(p.id)}" data-nome="${esc(nome)}">Trocar senha</button>
+      </div>
     </div>`;}).join("");
 }
 document.addEventListener("change",async e=>{
@@ -996,6 +1027,32 @@ function menuConta(){
   $("#mn-sair").onclick=async()=>{ closeSheet(); await sb.auth.signOut(); encerrar(); };
 }
 $("#btn-menu").addEventListener("click",()=>{ if(session) menuConta(); });
+
+/* ---------- gestor troca a senha de outra pessoa ---------- */
+function senhaDeOutroForm(id,nome){
+  openSheet(`<h3 id="ov-title">Trocar a senha de ${esc(nome)}</h3>
+    <p class="hint">Depois é só passar a nova senha para a pessoa.</p>
+    <label class="f">Nova senha<input id="so-1" type="text" autocomplete="off" spellcheck="false" placeholder="mínimo de 6 caracteres"></label>
+    <label class="check"><input type="checkbox" id="so-pedir" checked> Pedir para ela criar uma senha própria no próximo acesso</label>
+    <div class="msg err" id="so-msg"></div>
+    <div class="row end"><button class="ghost" id="so-cancel">Cancelar</button><button class="primary" id="so-ok">Salvar senha</button></div>`);
+  $("#so-cancel").onclick=closeSheet;
+  $("#so-ok").onclick=async()=>{
+    const nova=$("#so-1").value.trim(), m=$("#so-msg"); m.textContent="";
+    if(nova.length<6){ m.textContent="A senha precisa ter pelo menos 6 caracteres."; return; }
+    $("#so-ok").disabled=true;
+    const {error}=await sb.rpc("gestor_definir_senha",{alvo:id,nova,pedir_troca:$("#so-pedir").checked});
+    $("#so-ok").disabled=false;
+    if(error){
+      m.textContent=/could not find|does not exist|PGRST202/i.test(error.message+" "+(error.code||""))
+        ?"Falta rodar no Supabase o SQL da troca de senha. Peça o SQL e rode no SQL Editor."
+        :"Não foi possível trocar: "+error.message;
+      return;
+    }
+    closeSheet(); mostrarToast("Senha alterada",`Nova senha de ${nome}: ${nova}`,null);
+  };
+}
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-senha]"); if(b&&role==="gestor") senhaDeOutroForm(b.dataset.senha,b.dataset.nome); });
 async function carregarProcessos(){
   if(!role) return;
   const {data,error}=await sb.from("processos").select("*").order("criado_em",{ascending:false}).limit(5000);
