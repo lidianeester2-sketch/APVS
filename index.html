@@ -822,6 +822,8 @@ function editarForm(p){
       <label class="f">Liberação do regulador<input id="ed-regl" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm" value="${esc(isoParaBR(p.regulacao))}"></label>
       <label class="f">Status<select id="ed-st">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${p.status===k?"selected":""}>${l}</option>`).join("")}</select></label>
     </div>
+    <label class="check"><input type="checkbox" id="ed-retorno" ${p.retorno?"checked":""}> É retorno de processo liberado antes do sistema (não conta na planilha)</label>
+    <label class="f" id="ed-ret-wrap">Data em que voltou (o prazo de 3 dias úteis conta daqui)<input id="ed-ret" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm" value="${esc(isoParaBR(p.retornoEntrada))}"></label>
     ${p.resultado?`<div class="obs">${esc((RES[p.resultado]||{}).l)}${p.porte?" · "+esc(p.porte):""}${p.reducao!=null?" · redução "+brl(p.reducao):""}${errosTxt(p)?"\nErros: "+esc(errosTxt(p)):""}${p.descricaoErro?" — "+esc(p.descricaoErro):""}${p.obs?"\n"+esc(p.obs):""}</div>`:""}
     <div class="msg err" id="ed-msg"></div>
     <div class="row" style="justify-content:space-between">
@@ -829,11 +831,26 @@ function editarForm(p){
       <div class="row"><button class="ghost" id="ed-cancel">Cancelar</button>${p.resultado?`<button id="ed-rev">Editar revisão</button>`:""}<button class="primary" id="ed-ok">Salvar</button></div>
     </div>`);
   $("#ed-cancel").onclick=closeSheet;
+  const syncRet=()=>{ $("#ed-ret-wrap").hidden=!($("#ed-retorno").checked||p.retornos>0); };
+  syncRet(); $("#ed-retorno").onchange=syncRet;
   const rv=$("#ed-rev"); if(rv) rv.onclick=()=>revisaoForm(p,false);
   $("#ed-ok").onclick=async()=>{
     const ent=brParaIso($("#ed-ent").value), regl=brParaIso($("#ed-regl").value);
-    if(ent===false||regl===false){ $("#ed-msg").textContent="Data inválida. Use o formato dd/mm/aaaa hh:mm."; return; }
-    try{ await db.collection("processos").doc(p.id).update({regulador:$("#ed-reg").value.trim().toUpperCase()||null,entrada:ent,regulacao:regl,status:$("#ed-st").value}); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
+    const retEnt=brParaIso($("#ed-ret").value);
+    if(ent===false||regl===false||retEnt===false){ $("#ed-msg").textContent="Data inválida. Use o formato dd/mm/aaaa hh:mm."; return; }
+    const status=$("#ed-st").value, marcado=$("#ed-retorno").checked;
+    const corpo={regulador:$("#ed-reg").value.trim().toUpperCase()||null,entrada:ent,regulacao:regl,status};
+    if(marcado){
+      // liberado antes do sistema: sai da planilha
+      Object.assign(corpo,{retorno:true,liberadoEm:null,retornos:Math.max(p.retornos||0,1),retornoEntrada:retEnt||p.retornoEntrada||null});
+    }else{
+      Object.assign(corpo,{retorno:false,retornoEntrada:p.retornos>0?(retEnt||p.retornoEntrada||null):null});
+      if(p.retorno){ // desmarcou: volta a contar, na data da revisão
+        corpo.liberadoEm=(status==="comunicar"||status==="comunicado")&&p.revisadoEm?p.revisadoEm:null;
+        corpo.retornos=0; corpo.retornoEntrada=null;
+      }
+    }
+    try{ await db.collection("processos").doc(p.id).update(corpo); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
   let armed=false;
   $("#ed-del").onclick=async()=>{ if(!armed){armed=true;$("#ed-del").textContent="Clique de novo para excluir";return;} try{ await db.collection("processos").doc(p.id).delete(); closeSheet(); }catch(e){ $("#ed-msg").textContent=errText(e);} };
 }
