@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Processos APVS</title>
+<title>Sistema Trio · Esteira APVS</title>
 <meta name="theme-color" content="#F3F3F8">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Processos APVS">
+<meta name="apple-mobile-web-app-title" content="Trio">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -60,6 +60,10 @@ button.dl-row.danger{color:var(--red)}
 .switch.on{background:#34C759}
 .switch.on::after{transform:translateX(18px)}
 h1{font-size:34px;line-height:1.1;font-weight:700;margin:0;letter-spacing:-.02em;color:var(--navy)}
+.logo-trio{height:46px;width:auto;display:block;margin:2px 0 0 -2px}
+@media (max-width:760px){.logo-trio{height:40px}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.h-sub{font-size:16px;font-weight:600;color:var(--coral-ink);margin-top:2px;letter-spacing:.01em}
 
 
 /* desktop segmented control */
@@ -261,7 +265,8 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
         <button class="avatar" id="btn-menu" type="button" aria-label="Minha conta">·</button>
       </div>
     </div>
-    <h1>Processos APVS</h1>
+    <h1><span class="sr">Sistema Trio</span><svg class="logo-trio" aria-hidden="true" viewBox="0 0 256 100"><g transform="translate(0,9)"><polygon points="4,25 18,25 43,50 18,75 4,75 29,50" fill="#2D3178" opacity="0.4" stroke="#2D3178" stroke-width="2" stroke-linejoin="round"/><polygon points="33,25 47,25 72,50 47,75 33,75 58,50" fill="#2D3178" opacity="1" stroke="#2D3178" stroke-width="2" stroke-linejoin="round"/><polygon points="62,25 76,25 101,50 76,75 62,75 87,50" fill="#FB5D42" opacity="1" stroke="#FB5D42" stroke-width="2" stroke-linejoin="round"/></g><g transform="translate(122,7)"><g fill="none" stroke="#2D3178" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18 V64 Q9 78 23 78"/><path d="M0 38 H22"/><path d="M40 40 V78"/><path d="M40 57 Q40 40 59 40"/><path d="M74 40 V78"/><circle cx="107" cy="59" r="19.5"/></g><circle cx="74" cy="21" r="7.5" fill="#FB5D42"/></g></svg></h1>
+    <div class="h-sub">Esteira APVS</div>
   </header>
 
   <nav class="tabs" aria-label="Etapas">
@@ -343,6 +348,7 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
   <!-- LOGIN -->
   <section data-view="login" class="view" hidden>
     <div class="panel" style="max-width:420px;margin:0 auto;width:100%">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 6px"><img src="trio-logo.svg" alt="Sistema Trio" style="height:58px;width:auto"><span class="h-sub">Esteira APVS</span></div>
       <h2>Entrar</h2>
       <form id="f-login" style="display:flex;flex-direction:column;gap:12px">
         <label class="f">E-mail<input id="lg-email" type="email" autocomplete="username" required></label>
@@ -1047,7 +1053,7 @@ db={collection:()=>({doc:id=>({
 })})};
 
 let recarga=null, canal=null, filaAnterior=null;
-const TITULO="Processos APVS";
+const TITULO="Sistema Trio · Esteira APVS";
 
 /* ---------- avisos (som + notificação) ---------- */
 let audio=null;
