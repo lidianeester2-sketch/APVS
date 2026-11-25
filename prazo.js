@@ -52,8 +52,10 @@
   const EM_ANDAMENTO = ["revisao", "devolvido", "comunicar"];
   // null = sem prazo (já comunicado ou sem data de entrada)
   function situacao(p, agora) {
-    if (!p || !EM_ANDAMENTO.includes(p.status) || !p.entrada) return null;
-    const v = vencimento(p.entrada); if (!v) return null;
+    // retorno: prazo novo de 3 dias úteis a partir da data em que voltou
+    const base = p && (p.retornoEntrada || p.entrada);
+    if (!p || !EM_ANDAMENTO.includes(p.status) || !base) return null;
+    const v = vencimento(base); if (!v) return null;
     agora = agora || new Date();
     if (agora > v) return { nivel: "atrasado", vence: v };
     if (chave(v) === chave(agora)) return { nivel: "hoje", vence: v };

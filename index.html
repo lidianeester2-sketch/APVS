@@ -227,6 +227,8 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
   .board{grid-auto-columns:88%;margin:0 calc(-1 * max(16px,env(safe-area-inset-right,0px))) 0 0;padding-right:16px}
 }
 
+.chip.s-retorno{background:rgba(124,58,237,.12);color:#6D28D9}
+
 /* prazo */
 .card.prazo-atrasado{border:1.5px solid var(--red-bright);box-shadow:0 0 0 3px rgba(255,59,48,.1)}
 .card.prazo-hoje{border:1.5px solid #FF9500;box-shadow:0 0 0 3px rgba(255,149,0,.12)}
@@ -283,6 +285,7 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
         <label class="f">Regulador<input id="reg-regulador" list="regs" required placeholder="EMERSON"></label>
         <label class="f">Entrada<input id="reg-entrada" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm"></label>
         <label class="f">Liberação do regulador<input id="reg-regulacao" class="dt" inputmode="numeric" placeholder="dd/mm/aaaa hh:mm"></label>
+        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="reg-retorno"> É retorno de processo liberado antes do sistema (não conta na planilha)</label>
         <div class="row"><button class="primary" type="submit" id="reg-btn">Registrar</button></div>
       </form>
       <div class="msg" id="reg-msg" role="status"></div>
@@ -373,19 +376,19 @@ input.busca{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http
       <label class="f">Mês<input type="month" id="ex-mes"></label>
       <div class="stats">
         <div class="stat"><div class="v" id="st-n">0</div><div class="l">Processos na BASE</div></div>
-        <div class="stat"><div class="v" id="st-rev">0</div><div class="l">Revisões concluídas</div></div>
+        <div class="stat"><div class="v" id="st-rev">0</div><div class="l">Liberações no mês</div></div>
         <div class="stat"><div class="v" id="st-red">R$ 0,00</div><div class="l">Redução obtida</div></div>
         <div class="stat"><div class="v" id="st-miss">0</div><div class="l">Sem datas de entrada</div></div>
       </div>
       <div class="tablebox">
         <table>
-          <thead><tr><th>Dia</th><th class="num">Revisões</th><th class="num">Redução</th></tr></thead>
+          <thead><tr><th>Dia</th><th class="num">Liberações</th><th class="num">Redução</th></tr></thead>
           <tbody id="tb-dias"></tbody>
         </table>
       </div>
       <button class="primary" id="btn-export">Baixar planilha</button>
       <div class="msg" id="ex-msg" role="status"></div>
-      <p class="hint">Na <b>BASE DE DADOS</b> entram os processos com liberação do regulador no mês. Na aba <b>APVS</b>, cada dia útil recebe as revisões concluídas e a redução do dia. Dias que já passaram sem revisão saem com 0.</p>
+      <p class="hint">Na <b>BASE DE DADOS</b> entram os processos com liberação do regulador no mês. Na aba <b>APVS</b>, cada processo conta uma vez só, no dia em que foi liberado pela primeira vez. Retornos não contam de novo, e processos liberados antes do sistema não entram. Dias que já passaram sem liberação saem com 0.</p>
     </div>
   </section>
 </div>
@@ -496,6 +499,9 @@ function setCount(id,n,hot){const el=$("#"+id); el.textContent=n; el.classList.t
 
 const ICON_ALERTA='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>';
 const fmtVence=d=>d.toLocaleString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).replace(",","");
+const agoraLocal=()=>{const d=new Date(),z=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;};
+const ehRetorno=p=>!!(p.retorno||p.retornos);
+const tagRetorno=p=>ehRetorno(p)?`<span class="chip s-retorno">${p.retorno?"Retorno · liberado antes do sistema":(p.retornos>1?p.retornos+"º retorno":"Retorno")}</span>`:"";
 function prazoClasse(p){ const s=PrazoAPVS.situacao(p); return s&&s.nivel!=="ok"?" prazo-"+s.nivel:""; }
 function prazoTopo(p){
   const s=PrazoAPVS.situacao(p);
@@ -515,6 +521,7 @@ function cardRevisao(p){
   return `<button class="card click${prazoClasse(p)}" data-act="detalhe" data-id="${esc(p.id)}">
     ${prazoTopo(p)}
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${prazoChip(p,statusChip(p.status))}</div>
+    ${tagRetorno(p)?`<div>${tagRetorno(p)}</div>`:""}
     ${prazoMeta(p)}
     <div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span>${p.regulacao?`<span>Liberado <b>${fmtLocal(p.regulacao)}</b></span>`:""}${p.porte?`<span>Porte <b>${esc(p.porte)}</b></span>`:""}</div>
     ${(p.status==="devolvido"||/^Voltou da gestão/.test(p.obs||""))&&p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
@@ -532,6 +539,7 @@ function cardComunicar(p){
   return `<div class="card click${prazoClasse(p)}" data-act="detalhe" data-id="${esc(p.id)}">
     ${prazoTopo(p)}
     <div class="row" style="justify-content:space-between"><span class="proto">${esc(p.protocolo)}</span>${prazoChip(p,p.porte?`<span class="chip s-comunicar">${esc(p.porte)}</span>`:"")}</div>
+    ${tagRetorno(p)?`<div>${tagRetorno(p)}</div>`:""}
     ${prazoMeta(p)}
     <div class="res">${esc((RES[p.resultado]||{}).l||"—")}</div>
     ${valorDestaque(p)}
@@ -562,7 +570,7 @@ function renderTable(){
   const box=$("#tb-all");
   box.classList.toggle("list",rows.length>0);
   box.innerHTML=rows.length?rows.slice(0,400).map(p=>{
-    const sub=[p.regulador||"", (RES[p.resultado]||{}).l||"", p.erro&&p.erro!==SEM_ERRO?p.erro:""].filter(Boolean).join(" · ");
+    const sub=[ehRetorno(p)?"Retorno":"", p.regulador||"", (RES[p.resultado]||{}).l||"", p.erro&&p.erro!==SEM_ERRO?p.erro:""].filter(Boolean).join(" · ");
     const sp=PrazoAPVS.situacao(p);
     const side=sp&&sp.nivel==="atrasado"?'<span class="prazo-txt atrasado">Atrasado</span>':sp&&sp.nivel==="hoje"?'<span class="prazo-txt hoje">Vence hoje!</span>':faltaData(p)?'<span class="miss">Faltam datas</span>':(p.reducao!=null?brl(p.reducao):(p.regulacao?fmtLocal(p.regulacao):""));
     return `<button class="lrow" data-act="detalhe" data-id="${esc(p.id)}">
@@ -618,6 +626,7 @@ function revisaoForm(p,novo){
     ${novo?`<div class="grid-form">
       <label class="f">Protocolo<input id="rv-proto" class="mono" placeholder="A202611S27I 249805-0APVS"></label>
       <label class="f">Regulador<input id="rv-reg" list="regs" placeholder="EMERSON"></label></div>
+      <label class="check"><input type="checkbox" id="rv-retorno"> É retorno de processo liberado antes do sistema (não conta na planilha)</label>
       <p class="hint">As datas de entrada e liberação a Lidi completa depois.</p>`
       :`<div><div class="proto">${esc(p.protocolo)}</div><div class="meta"><span>Regulador <b>${esc(p.regulador||"—")}</b></span></div></div>`}
     <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="fieldlabel">Porte</span>
@@ -661,7 +670,16 @@ function revisaoForm(p,novo){
       const proto=normProto($("#rv-proto").value), reg=$("#rv-reg").value.trim().toUpperCase();
       if(!proto||!docId(proto)){m.textContent="Informe o protocolo.";return;}
       if(!reg){m.textContent="Informe o regulador.";return;}
-      const id=docId(proto); target=all.find(x=>x.id===id)||{id,protocolo:proto,regulador:reg,criadoEm:Date.now(),criadoPor:"revisao",status:"revisao"};
+      const id=docId(proto); const retornoFora=$("#rv-retorno")&&$("#rv-retorno").checked;
+      target=all.find(x=>x.id===id);
+      if(target&&(target.status==="comunicar"||target.status==="comunicado")){
+        // já foi liberado pelo sistema: registra o retorno (não conta de novo na planilha)
+        const {error}=await sb.rpc("registrar_retorno",{alvo:id,entrada_retorno:null});
+        if(error){ m.textContent=errText(mapErr(error)); return; }
+        await carregarProcessos(); target=all.find(x=>x.id===id);
+      }
+      if(!target) target={id,protocolo:proto,regulador:reg,criadoEm:Date.now(),criadoPor:"revisao",status:"revisao",
+        retorno:retornoFora,retornoEntrada:retornoFora?agoraLocal():null,retornos:retornoFora?1:0};
       if(!target.regulador) target.regulador=reg;
     }
     if(!devolver){
@@ -680,7 +698,7 @@ function revisaoForm(p,novo){
       erro2:st.erro&&st.erro!==SEM_ERRO?(st.erro2||null):null,
       descricaoErro:st.erro&&st.erro!==SEM_ERRO?($("#rv-desc").value.trim()||null):null};
     if(devolver){ body.status="devolvido"; body.devolvidoEm=Date.now(); if(!body.obs){m.textContent="Escreva na observação o que precisa ser ajustado.";return;} }
-    else { body.status="comunicar"; body.revisadoEm=Date.now(); body.exportadoEm=null; body.comunicadoEm=null; }
+    else { body.status="comunicar"; body.revisadoEm=Date.now(); body.liberadoEm=target.liberadoEm||(target.retorno?null:body.revisadoEm); body.exportadoEm=null; body.comunicadoEm=null; }
     delete body.id;
     try{ await db.collection("processos").doc(target.id).set(body); closeSheet(); }
     catch(e){ m.textContent=errText(e); }
@@ -697,7 +715,9 @@ function detalheForm(p){
   const eventos=[
     [p.criadoEm,p.criadoPor==="revisao"?"Registrado pelo Cristiano":"Registrado"],
     [p.devolvidoEm,"Devolvido ao regulador"],
-    [p.revisadoEm,"Revisão concluída"],
+    [p.liberadoEm,"Liberado (conta na planilha)"],
+    [p.retornoEntrada?Date.parse(p.retornoEntrada):null,p.retornos>1?`Voltou do regulador (${p.retornos}º retorno)`:"Voltou do regulador"],
+    [p.revisadoEm&&p.revisadoEm!==p.liberadoEm?p.revisadoEm:null,"Revisão concluída"],
     [p.comunicadoEm,"Comunicado"],
   ].filter(e=>e[0]).sort((a,b)=>a[0]-b[0]);
   const podeComunicar=(role==="comunicacao"||role==="gestor")&&p.status==="comunicar";
@@ -715,6 +735,8 @@ function detalheForm(p){
       linha("Porte",esc(p.porte||"")),
       linha("Entrada",p.entrada?fmtLocal(p.entrada):'<span class="miss">Falta</span>'),
       linha("Liberação do regulador",p.regulacao?fmtLocal(p.regulacao):'<span class="miss">Falta</span>'),
+      p.retorno?linha("Planilha","Não conta (liberado antes do sistema)"):p.liberadoEm?linha("Conta na planilha em",fmtTs(p.liberadoEm)):"",
+      ehRetorno(p)&&p.retornoEntrada?linha("Último retorno",fmtLocal(p.retornoEntrada)):"",
       (()=>{ const sp=PrazoAPVS.situacao(p); if(!sp) return "";
         const txt=fmtVence(sp.vence)+(sp.nivel==="atrasado"?" · atrasado":sp.nivel==="hoje"?" · vence hoje":"");
         return linha("Prazo (3 dias úteis)",txt,"prazo-txt "+sp.nivel); })(),
@@ -886,16 +908,24 @@ document.addEventListener("input",e=>{
 });
 
 /* ---------- registrar (um ou vários) ---------- */
-async function registrarUm({proto,reg,ent,regl}){
+async function registrarUm({proto,reg,ent,regl,retorno}){
   proto=normProto(proto); const id=docId(proto); reg=(reg||"").trim().toUpperCase();
   if(!id) throw {code:"erro",message:"protocolo inválido"};
   const ex=all.find(x=>x.id===id);
+  if(ex&&(ex.status==="comunicar"||ex.status==="comunicado")){
+    // já liberado pelo sistema: é um retorno. Volta para a revisão sem contar de novo na planilha
+    const {error}=await sb.rpc("registrar_retorno",{alvo:id,entrada_retorno:ent||null});
+    if(error) throw mapErr(error);
+    await carregarProcessos();
+    return {proto,tipo:"retorno"};
+  }
   if(ex){
     await db.collection("processos").doc(id).update({regulador:reg||ex.regulador,entrada:ent||ex.entrada||null,regulacao:regl||ex.regulacao||null});
-    return {proto,novo:false,status:ex.status};
+    return {proto,tipo:"existente",status:ex.status};
   }
-  await db.collection("processos").doc(id).set({protocolo:proto,regulador:reg,entrada:ent||null,regulacao:regl||null,status:"revisao",criadoEm:Date.now(),criadoPor:"registro"});
-  return {proto,novo:true};
+  await db.collection("processos").doc(id).set({protocolo:proto,regulador:reg,entrada:ent||null,regulacao:regl||null,status:"revisao",criadoEm:Date.now(),criadoPor:"registro",
+    retorno:!!retorno,retornoEntrada:retorno?(ent||agoraLocal()):null,retornos:retorno?1:0});
+  return {proto,tipo:retorno?"retornoFora":"novo"};
 }
 function limparRegistro(){ ["#reg-proto","#reg-regulador","#reg-entrada","#reg-regulacao"].forEach(s=>$(s).value=""); $("#reg-proto").focus(); }
 
@@ -906,8 +936,13 @@ $("#f-reg").addEventListener("submit",async e=>{
   if(ent===false){m.className="msg err";m.textContent="Data de entrada inválida. Use dd/mm/aaaa hh:mm.";return;}
   if(regl===false){m.className="msg err";m.textContent="Data de liberação inválida. Use dd/mm/aaaa hh:mm.";return;}
   try{
-    const r=await registrarUm({proto:$("#reg-proto").value,reg:$("#reg-regulador").value,ent,regl});
-    m.className="msg ok"; m.textContent=r.novo?`${r.proto} registrado e enviado para revisão.`:`${r.proto} já existia (${STATUS[r.status]}). Atualizei regulador e datas.`;
+    const r=await registrarUm({proto:$("#reg-proto").value,reg:$("#reg-regulador").value,ent,regl,retorno:$("#reg-retorno").checked});
+    m.className="msg ok";
+    m.textContent=r.tipo==="novo"?`${r.proto} registrado e enviado para revisão.`
+      :r.tipo==="retorno"?`${r.proto} já tinha sido liberado: registrei como retorno. Voltou para a revisão e não conta de novo na planilha.`
+      :r.tipo==="retornoFora"?`${r.proto} registrado como retorno. Vai para a revisão e não entra na planilha.`
+      :`${r.proto} já existia (${STATUS[r.status]}). Atualizei regulador e datas.`;
+    $("#reg-retorno").checked=false;
     limparRegistro();
   }catch(err){ m.className="msg err"; m.textContent=errText(err); }
 });
@@ -944,10 +979,10 @@ $("#f-reg").addEventListener("paste",e=>{
 });
 function registrarVariosForm(itens){
   openSheet(`<h3 id="ov-title">Registrar ${itens.length} processos</h3>
-    <p class="hint">Confira o que veio da planilha. Protocolos que já existem só têm regulador e datas atualizados.</p>
+    <p class="hint">Confira o que veio da planilha. Protocolos já liberados voltam como retorno (sem contar de novo). Os que ainda estão em andamento só têm regulador e datas atualizados.</p>
     <div class="list">${itens.map(x=>`<div class="lrow" style="min-height:0"><div class="lmain"><span class="proto">${esc(normProto(x.proto))}</span>
       <span class="lsub">${esc((x.reg||"sem regulador").toUpperCase())} · Entrada ${x.ent?isoParaBR(x.ent):"—"} · Liberação ${x.regl?isoParaBR(x.regl):"—"}</span></div>
-      ${all.find(p=>p.id===docId(x.proto))?'<span class="chip s-comunicado">Já existe</span>':""}</div>`).join("")}</div>
+      ${(()=>{const e=all.find(p=>p.id===docId(x.proto)); return !e?"":(e.status==="comunicar"||e.status==="comunicado")?'<span class="chip s-retorno">Retorno</span>':'<span class="chip s-comunicado">Já existe</span>';})()}</div>`).join("")}</div>
     <div class="msg" id="rv-msg"></div>
     <div class="row end"><button class="ghost" id="rv-cancel">Cancelar</button><button class="primary" id="rv-ok">Registrar ${itens.length}</button></div>`);
   $("#rv-cancel").onclick=closeSheet;
@@ -955,7 +990,7 @@ function registrarVariosForm(itens){
     const b=$("#rv-ok"), m=$("#rv-msg"); b.disabled=true; let ok=0, erros=[];
     for(const x of itens){
       m.className="msg"; m.textContent=`Registrando ${ok+erros.length+1} de ${itens.length}…`;
-      try{ await registrarUm(x); ok++; }catch(err){ erros.push(normProto(x.proto)+": "+errText(err)); }
+      try{ await registrarUm({...x,retorno:$("#reg-retorno").checked}); ok++; }catch(err){ erros.push(normProto(x.proto)+": "+errText(err)); }
     }
     if(erros.length){ m.className="msg err"; m.textContent=`${ok} registrados. Com problema: ${erros.join(" | ")}`; b.disabled=false; return; }
     closeSheet(); limparRegistro(); const rm=$("#reg-msg"); rm.className="msg ok"; rm.textContent=`${ok} processos registrados e enviados para revisão.`;
@@ -968,16 +1003,19 @@ if(!window.supabase){ const b=$("#banner"); b.hidden=false; b.textContent="Não 
 const sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
 const COLS={protocolo:"protocolo",regulador:"regulador",entrada:"entrada",regulacao:"regulacao",status:"status",porte:"porte",resultado:"resultado",
   erro:"erro",erro2:"erro2",descricaoErro:"descricao_erro",reducao:"reducao",valorComunicar:"valor_comunicar",valorAprovado:"valor_aprovado",obs:"obs",
-  revisadoEm:"revisado_em",devolvidoEm:"devolvido_em",comunicadoEm:"comunicado_em",notaComunicacao:"nota_comunicacao",exportadoEm:"exportado_em",criadoEm:"criado_em",criadoPor:"criado_por"};
-const TS=new Set(["revisadoEm","devolvidoEm","comunicadoEm","exportadoEm","criadoEm"]);
+  revisadoEm:"revisado_em",devolvidoEm:"devolvido_em",comunicadoEm:"comunicado_em",notaComunicacao:"nota_comunicacao",exportadoEm:"exportado_em",criadoEm:"criado_em",criadoPor:"criado_por",
+  liberadoEm:"liberado_em",retorno:"retorno",retornoEntrada:"retorno_entrada",retornos:"retornos"};
+const TS=new Set(["revisadoEm","devolvidoEm","comunicadoEm","exportadoEm","criadoEm","liberadoEm"]);
+const LOCAL=new Set(["entrada","regulacao","retornoEntrada"]);
 const NUM=new Set(["reducao","valorComunicar","valorAprovado"]);
-function toRow(o){const r={};for(const k in o){if(!COLS[k])continue;let v=o[k];if(TS.has(k))v=v==null?null:new Date(v).toISOString();if((k==="entrada"||k==="regulacao")&&!v)v=null;r[COLS[k]]=v===undefined?null:v;}return r;}
-function fromRow(r){const o={id:r.id};for(const k in COLS){let v=r[COLS[k]];if(TS.has(k))v=v?Date.parse(v):null;else if(NUM.has(k))v=v==null?null:Number(v);else if((k==="entrada"||k==="regulacao")&&v)v=String(v).slice(0,16);o[k]=v??null;}return o;}
+function toRow(o){const r={};for(const k in o){if(!COLS[k])continue;let v=o[k];if(TS.has(k))v=v==null?null:new Date(v).toISOString();if(LOCAL.has(k)&&!v)v=null;if(k==="retorno")v=!!v;if(k==="retornos")v=v||0;r[COLS[k]]=v===undefined?null:v;}return r;}
+function fromRow(r){const o={id:r.id};for(const k in COLS){let v=r[COLS[k]];if(TS.has(k))v=v?Date.parse(v):null;else if(NUM.has(k))v=v==null?null:Number(v);else if(LOCAL.has(k)&&v)v=String(v).slice(0,16);o[k]=v??null;}return o;}
 function mapErr(e){
   if(!e) return {code:"erro"};
   console.error("Supabase:",e);
   if(/row-level security/i.test(e.message||"")) return {code:"sem_permissao"};
   if(e.code==="42501") return {code:"erro",message:"o banco recusou o acesso à tabela ("+e.message+")"};
+  if(/liberado_em|retorno_entrada|registrar_retorno|retornos/.test(e.message||"")) return {code:"erro",message:"falta rodar no Supabase o SQL de retorno (supabase-retorno.sql)"};
   if(e.code==="23505") return {code:"duplicado"};
   if(/fetch|network/i.test(e.message||"")) return {code:"rede"};
   return {code:"erro",message:e.message};

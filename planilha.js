@@ -105,20 +105,21 @@
   /* ---------- regras de negócio ---------- */
   const auditoriaDe = p => !p.erro ? "" : (p.erro === SEM_ERRO ? "Aprovado" : "Reprovado");
   const obsDe = p => [p.erro2 ? "2º erro: " + p.erro2 : "", p.descricaoErro || ""].filter(Boolean).join(" · ");
-  const revisado = p => (p.status === "comunicar" || p.status === "comunicado") && p.revisadoEm;
+  // cada protocolo conta uma vez só, no dia da PRIMEIRA liberação; retornos de antes do sistema nunca contam
+  const liberacao = p => p.retorno ? null : (p.liberadoEm || ((p.status === "comunicar" || p.status === "comunicado") ? p.revisadoEm : null));
   // mês do processo na BASE: pela liberação do regulador; sem ela, pela revisão; sem as duas, pelo registro
   function mesDoProcesso(p) {
     if (p.regulacao) return String(p.regulacao).slice(0, 7);
-    if (p.revisadoEm) return diaMs(p.revisadoEm).slice(0, 7);
+    if (liberacao(p)) return diaMs(liberacao(p)).slice(0, 7);
     return p.criadoEm ? diaMs(p.criadoEm).slice(0, 7) : "";
   }
 
   function resumo(processos, mesISO) {
-    const base = processos.filter(p => mesDoProcesso(p) === mesISO)
+    const base = processos.filter(p => !p.retorno && mesDoProcesso(p) === mesISO)
       .sort((a, b) => (serialTexto(a.regulacao) ?? serialMs(a.revisadoEm) ?? 1e9) - (serialTexto(b.regulacao) ?? serialMs(b.revisadoEm) ?? 1e9));
     const porDia = {};
-    processos.filter(p => revisado(p) && diaMs(p.revisadoEm).slice(0, 7) === mesISO).forEach(p => {
-      const k = diaMs(p.revisadoEm); const o = porDia[k] || (porDia[k] = { n: 0, red: 0 });
+    processos.filter(p => liberacao(p) && diaMs(liberacao(p)).slice(0, 7) === mesISO).forEach(p => {
+      const k = diaMs(liberacao(p)); const o = porDia[k] || (porDia[k] = { n: 0, red: 0 });
       o.n++; o.red += p.reducao || 0;
     });
     return { base, porDia };
